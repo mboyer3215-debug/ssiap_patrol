@@ -494,14 +494,14 @@ function logout() {
 
 // ========== NAVIGATION ==========
 const menuItems = [
-    { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap2: true, ssiap3: true },
-    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap2: true, ssiap3: true },
-    { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap2: true },
-    { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap2: true, ssiap3: true },
-    { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap2: true, ssiap3: true },
-    { id: 'materiels', icon: 'fa-fire-extinguisher', label: 'Matériels', ssiap2: true },
-    { id: 'consignes', icon: 'fa-file-alt', label: 'Consignes', ssiap2: true },
-    { id: 'agents', icon: 'fa-users', label: 'Agents', ssiap3: true }
+    { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap1: false, ssiap2: true, ssiap3: true },
+    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: true },
+    { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap1: true, ssiap2: true, ssiap3: true },
+    { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap1: false, ssiap2: true, ssiap3: true },
+    { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap1: false, ssiap2: true, ssiap3: true },
+    { id: 'materiels', icon: 'fa-fire-extinguisher', label: 'Matériels', ssiap1: true, ssiap2: true, ssiap3: true },
+    { id: 'consignes', icon: 'fa-file-alt', label: 'Consignes', ssiap1: true, ssiap2: true, ssiap3: true },
+    { id: 'agents', icon: 'fa-users', label: 'Agents', ssiap1: false, ssiap2: false, ssiap3: true }
 ];
 
 function initApp() {
@@ -514,9 +514,9 @@ function renderNav() {
     const qual = currentUser?.qualification;
     document.getElementById('navMenu').innerHTML = menuItems
         .filter(m => {
-            if (qual === 'SSIAP 3') return true;
-            if (qual === 'SSIAP 2') return m.ssiap2 || false;
-            if (qual === 'SSIAP 1') return !m.ssiap2 && !m.ssiap3;
+            if (qual === 'SSIAP 3') return m.ssiap3;
+            if (qual === 'SSIAP 2') return m.ssiap2;
+            if (qual === 'SSIAP 1') return m.ssiap1;
             return false;
         })
         .map(m => `
