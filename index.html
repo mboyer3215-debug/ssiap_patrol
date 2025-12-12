@@ -721,47 +721,169 @@ function renderPrisePoste() {
 }
 
 function showModalPrisePoste() {
-    const agents = DB.agents.filter(a => a.actif);
     const hasChef = getChefDePoste();
     showModal('Nouvelle Prise de Poste', `
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-semibold mb-2">Agent</label>
-                <select id="ppAgent" class="input">
-                    <option value="">Sélectionner...</option>
-                    ${agents.map(a => `<option value="${a.id}">${a.prenom} ${a.nom} - ${a.qualification}</option>`).join('')}
+                <label class="block text-sm font-semibold mb-2">Niveau SSIAP</label>
+                <select id="ppNiveau" class="input" onchange="updateAgentsList()">
+                    <option value="">Sélectionner un niveau...</option>
+                    <option value="SSIAP 1">SSIAP 1</option>
+                    <option value="SSIAP 2">SSIAP 2</option>
+                    <option value="SSIAP 3">SSIAP 3</option>
                 </select>
             </div>
-            <div>
+
+            <div id="agentSection" style="display: none;">
+                <label class="block text-sm font-semibold mb-2">👤 Agents (1)</label>
+                <input type="text" id="ppAgentSearch" class="input mb-2" placeholder="Rechercher un agent..." oninput="filterAgentsList()">
+                <select id="ppAgent" class="input" size="5" style="height: 120px;">
+                </select>
+            </div>
+
+            <div id="posteSection" style="display: none;">
                 <label class="block text-sm font-semibold mb-2">Poste</label>
-                <select id="ppPoste" class="input">
-                    <option value="Équipier">Équipier</option>
+                <select id="ppPoste" class="input" onchange="updateVerifications()">
                     ${!hasChef ? '<option value="Chef de poste">Chef de poste</option>' : ''}
+                    <option value="Chef d\'Équipe">Chef d\'Équipe</option>
                 </select>
             </div>
-            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
-                <div class="font-semibold mb-3">Vérifications</div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <label class="flex items-center gap-2"><input type="checkbox" id="vSSI"> SSI</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" id="vSignal"> Signalisation</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" id="vEcran"> Écran contrôle</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" id="vPortatif"> Portatif</label>
-                </div>
-            </div>
+
+            <div id="verificationsSection"></div>
         </div>
     `, () => {
         const agentId = parseInt(document.getElementById('ppAgent').value);
         if (!agentId) return showToast('Sélectionnez un agent', 'error');
 
-        const pp = { id: genId(), agentId, poste: document.getElementById('ppPoste').value, heureDebut: new Date().toISOString(), finPoste: null };
+        const verifications = {
+            techniques: [],
+            administratives: []
+        };
+
+        document.querySelectorAll('#verificationsSection input[type="checkbox"]').forEach(cb => {
+            if (cb.checked) {
+                const category = cb.getAttribute('data-category');
+                if (category === 'technique') verifications.techniques.push(cb.getAttribute('data-label'));
+                else verifications.administratives.push(cb.getAttribute('data-label'));
+            }
+        });
+
+        const pp = {
+            id: genId(),
+            agentId,
+            poste: document.getElementById('ppPoste').value,
+            heureDebut: new Date().toISOString(),
+            finPoste: null,
+            verifications
+        };
         DB.prisesPoste.push(pp);
 
         const agent = DB.agents.find(a => a.id === agentId);
         addMainCourante('Prise de Poste', `${pp.poste} - ${agent.prenom} ${agent.nom}`, agentId);
+        sauvegarderVersFirebase();
         closeModal();
         showToast('Prise de poste enregistrée');
         navigate('prisePoste');
     });
+
+    setTimeout(() => {
+        updateVerifications();
+    }, 100);
+}
+
+function updateAgentsList() {
+    const niveau = document.getElementById('ppNiveau').value;
+    const agentSection = document.getElementById('agentSection');
+    const posteSection = document.getElementById('posteSection');
+    const agentSelect = document.getElementById('ppAgent');
+
+    if (!niveau) {
+        agentSection.style.display = 'none';
+        posteSection.style.display = 'none';
+        return;
+    }
+
+    const agentsActifs = DB.agents.filter(a => a.actif && a.qualification === niveau);
+    const agentsEnPoste = getAgentsEnPoste().map(a => a.id);
+    const agentsDisponibles = agentsActifs.filter(a => !agentsEnPoste.includes(a.id));
+
+    agentSelect.innerHTML = agentsDisponibles.map(a =>
+        `<option value="${a.id}">${a.prenom} ${a.nom}</option>`
+    ).join('');
+
+    agentSection.style.display = agentsDisponibles.length ? 'block' : 'none';
+    posteSection.style.display = agentsDisponibles.length ? 'block' : 'none';
+
+    if (agentsDisponibles.length === 0) {
+        agentSelect.innerHTML = '<option value="">Aucun agent disponible</option>';
+    }
+}
+
+function filterAgentsList() {
+    const search = document.getElementById('ppAgentSearch').value.toLowerCase();
+    const agentSelect = document.getElementById('ppAgent');
+    const options = Array.from(agentSelect.options);
+
+    options.forEach(opt => {
+        const text = opt.textContent.toLowerCase();
+        opt.style.display = text.includes(search) ? '' : 'none';
+    });
+}
+
+function updateVerifications() {
+    const poste = document.getElementById('ppPoste')?.value;
+    const section = document.getElementById('verificationsSection');
+    if (!section) return;
+
+    if (poste === 'Chef de poste') {
+        section.innerHTML = `
+            <div class="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2">
+                    <i class="fas fa-clipboard-check text-purple-600"></i>
+                    Vérifications Techniques
+                </div>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="PTI"> PTI</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Lampe torche"> Lampe torche</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Trousseaux de clés"> Trousseaux de clés</label>
+                </div>
+            </div>
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2">
+                    <i class="fas fa-file-alt text-blue-600"></i>
+                    Vérifications Administratives
+                </div>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes particulières"> Consignes particulières</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes générales"> Consignes générales</label>
+                </div>
+            </div>
+        `;
+    } else {
+        section.innerHTML = `
+            <div class="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2">
+                    <i class="fas fa-clipboard-check text-purple-600"></i>
+                    Vérifications Techniques
+                </div>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Test radio"> Test radio</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Lampe torche"> Lampe torche</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Outils de ronde"> Outils de ronde</label>
+                </div>
+            </div>
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2">
+                    <i class="fas fa-file-alt text-blue-600"></i>
+                    Vérifications Administratives
+                </div>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes particulières"> Consignes particulières</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes générales"> Consignes générales</label>
+                </div>
+            </div>
+        `;
+    }
 }
 
 function finPoste(id) {
