@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SSIAP Patrol - Gestion Sécurité Incendie</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -206,16 +206,8 @@
 
         <nav class="py-4" id="navMenu"></nav>
 
-        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-slate-700 space-y-2">
-            <button onclick="sauvegarderVersFirebase(); sauvegarderDonnees();" class="btn btn-success w-full justify-center btn-sm" title="Sauvegarder dans Firebase + fichier">
-                <i class="fas fa-cloud-upload-alt"></i> Sauvegarder
-            </button>
-            <button onclick="chargerDonnees()" class="btn btn-secondary w-full justify-center btn-sm">
-                <i class="fas fa-upload"></i> Charger fichier
-            </button>
-            <button onclick="logout()" class="btn btn-secondary w-full justify-center">
-                <i class="fas fa-sign-out-alt"></i> Déconnexion
-            </button>
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-slate-700 space-y-2" id="sidebarActions">
+            <!-- Boutons dynamiques selon le niveau SSIAP -->
         </div>
     </aside>
 
@@ -485,6 +477,12 @@ function showLoginError(msg) {
 }
 
 function logout() {
+    // Sauvegarde automatique pour SSIAP 2 à la déconnexion
+    if (currentUser?.qualification === 'SSIAP 2') {
+        sauvegarderVersFirebase();
+        telechargerBackupAuto();
+    }
+
     currentUser = null;
     document.getElementById('mainApp').classList.add('hidden');
     document.getElementById('loginScreen').classList.remove('hidden');
@@ -492,10 +490,35 @@ function logout() {
     document.getElementById('loginError').classList.add('hidden');
 }
 
+function telechargerBackupAuto() {
+    const saveData = {
+        version: '1.0',
+        date: new Date().toISOString(),
+        agents: DB.agents,
+        materiels: DB.materiels,
+        prisesPoste: DB.prisesPoste,
+        rondes: DB.rondes,
+        evenements: DB.evenements,
+        mainCourante: DB.mainCourante,
+        consignes: DB.consignes
+    };
+
+    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ssiap-patrol-backup.json'; // Toujours le même nom = écrase l'ancien
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 // ========== NAVIGATION ==========
 const menuItems = [
     { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap1: false, ssiap2: true, ssiap3: true },
-    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: true },
+    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: false },
+    { id: 'verifications', icon: 'fa-clipboard-check', label: 'Vérifications', ssiap1: false, ssiap2: true, ssiap3: true },
     { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap1: true, ssiap2: true, ssiap3: true },
     { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap1: false, ssiap2: true, ssiap3: true },
     { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap1: false, ssiap2: true, ssiap3: true },
@@ -506,8 +529,37 @@ const menuItems = [
 
 function initApp() {
     renderNav();
+    renderSidebarActions();
     const defaultView = currentUser?.qualification === 'SSIAP 1' ? 'rondes' : 'dashboard';
     navigate(defaultView);
+}
+
+function renderSidebarActions() {
+    const qual = currentUser?.qualification;
+    const container = document.getElementById('sidebarActions');
+
+    let html = '';
+
+    // SSIAP 3 : Boutons manuels de sauvegarde/chargement
+    if (qual === 'SSIAP 3') {
+        html += `
+            <button onclick="sauvegarderVersFirebase(); sauvegarderDonnees();" class="btn btn-success w-full justify-center btn-sm" title="Sauvegarder dans Firebase + fichier">
+                <i class="fas fa-cloud-upload-alt"></i> Sauvegarder
+            </button>
+            <button onclick="chargerDonnees()" class="btn btn-secondary w-full justify-center btn-sm">
+                <i class="fas fa-upload"></i> Charger fichier
+            </button>
+        `;
+    }
+
+    // Bouton déconnexion pour tous
+    html += `
+        <button onclick="logout()" class="btn btn-secondary w-full justify-center">
+            <i class="fas fa-sign-out-alt"></i> Déconnexion
+        </button>
+    `;
+
+    container.innerHTML = html;
 }
 
 function renderNav() {
@@ -557,6 +609,7 @@ function toggleSidebar() {
 const views = {
     dashboard: renderDashboard,
     prisePoste: renderPrisePoste,
+    verifications: renderVerifications,
     rondes: renderRondes,
     mainCourante: renderMainCourante,
     evenements: renderEvenements,
@@ -721,7 +774,6 @@ function renderPrisePoste() {
 }
 
 function showModalPrisePoste() {
-    const hasChef = getChefDePoste();
     showModal('Nouvelle Prise de Poste', `
         <div class="space-y-4">
             <div>
@@ -735,7 +787,7 @@ function showModalPrisePoste() {
             </div>
 
             <div id="agentSection" style="display: none;">
-                <label class="block text-sm font-semibold mb-2">👤 Agents (1)</label>
+                <label class="block text-sm font-semibold mb-2">👤 Agents</label>
                 <input type="text" id="ppAgentSearch" class="input mb-2" placeholder="Rechercher un agent..." oninput="filterAgentsList()">
                 <select id="ppAgent" class="input" size="5" style="height: 120px;">
                 </select>
@@ -743,38 +795,22 @@ function showModalPrisePoste() {
 
             <div id="posteSection" style="display: none;">
                 <label class="block text-sm font-semibold mb-2">Poste</label>
-                <select id="ppPoste" class="input" onchange="updateVerifications()">
-                    ${!hasChef ? '<option value="Chef de poste">Chef de poste</option>' : ''}
-                    <option value="Chef d\'Équipe">Chef d\'Équipe</option>
+                <select id="ppPoste" class="input">
                 </select>
             </div>
-
-            <div id="verificationsSection"></div>
         </div>
     `, () => {
         const agentId = parseInt(document.getElementById('ppAgent').value);
         if (!agentId) return showToast('Sélectionnez un agent', 'error');
 
-        const verifications = {
-            techniques: [],
-            administratives: []
-        };
-
-        document.querySelectorAll('#verificationsSection input[type="checkbox"]').forEach(cb => {
-            if (cb.checked) {
-                const category = cb.getAttribute('data-category');
-                if (category === 'technique') verifications.techniques.push(cb.getAttribute('data-label'));
-                else verifications.administratives.push(cb.getAttribute('data-label'));
-            }
-        });
-
+        const poste = document.getElementById('ppPoste').value;
         const pp = {
             id: genId(),
             agentId,
-            poste: document.getElementById('ppPoste').value,
+            poste,
             heureDebut: new Date().toISOString(),
             finPoste: null,
-            verifications
+            verificationsEffectuees: false
         };
         DB.prisesPoste.push(pp);
 
@@ -783,12 +819,60 @@ function showModalPrisePoste() {
         sauvegarderVersFirebase();
         closeModal();
         showToast('Prise de poste enregistrée');
-        navigate('prisePoste');
-    });
 
+        // Ouvrir automatiquement la page Vérifications pour tous les postes
+        navigate('verifications');
+
+        // Programmer un rappel si les vérifications ne sont pas faites après 30 secondes
+        setTimeout(() => {
+            const ppCheck = DB.prisesPoste.find(p => p.id === pp.id);
+            if (ppCheck && !ppCheck.verificationsEffectuees) {
+                showRappelVerifications(agent);
+            }
+        }, 30000);
+    });
+}
+
+function showRappelVerifications(agent) {
+    const rappelDiv = document.createElement('div');
+    rappelDiv.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-lg w-full mx-4';
+    rappelDiv.id = 'rappelVerifications';
+    rappelDiv.innerHTML = `
+        <div class="bg-yellow-100 dark:bg-yellow-900/50 border-2 border-yellow-500 rounded-xl p-4 shadow-lg">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xl">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-bold text-yellow-700 dark:text-yellow-300 text-lg">⚠️ Rappel Vérifications</div>
+                    <div class="text-yellow-600 dark:text-yellow-400">
+                        Vous avez oublié de faire les vérifications pour <strong>${agent.prenom} ${agent.nom}</strong>
+                    </div>
+                </div>
+                <button onclick="this.closest('.fixed').remove()" class="ml-auto text-yellow-500 hover:text-yellow-700 text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mt-3 flex gap-2">
+                <button onclick="this.closest('.fixed').remove(); navigate('verifications');" class="btn btn-warning btn-sm flex-1">
+                    <i class="fas fa-clipboard-check mr-1"></i> Faire les vérifications
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Supprimer un ancien rappel s'il existe
+    const oldRappel = document.getElementById('rappelVerifications');
+    if (oldRappel) oldRappel.remove();
+
+    document.body.appendChild(rappelDiv);
+
+    // Auto-fermeture après 15 secondes
     setTimeout(() => {
-        updateVerifications();
-    }, 100);
+        if (rappelDiv.parentNode) {
+            rappelDiv.remove();
+        }
+    }, 15000);
 }
 
 function updateAgentsList() {
@@ -796,6 +880,7 @@ function updateAgentsList() {
     const agentSection = document.getElementById('agentSection');
     const posteSection = document.getElementById('posteSection');
     const agentSelect = document.getElementById('ppAgent');
+    const posteSelect = document.getElementById('ppPoste');
 
     if (!niveau) {
         agentSection.style.display = 'none';
@@ -810,6 +895,29 @@ function updateAgentsList() {
     agentSelect.innerHTML = agentsDisponibles.map(a =>
         `<option value="${a.id}">${a.prenom} ${a.nom}</option>`
     ).join('');
+
+    // Mise à jour des postes selon le niveau SSIAP
+    const hasChef = getChefDePoste();
+    let postesOptions = '';
+
+    if (niveau === 'SSIAP 1') {
+        // SSIAP 1 = uniquement Équipier
+        postesOptions = '<option value="Équipier">Équipier</option>';
+    } else if (niveau === 'SSIAP 2') {
+        // SSIAP 2 = Chef de poste (si pas déjà pris) ou Chef d'Équipe
+        if (!hasChef) {
+            postesOptions += '<option value="Chef de poste">Chef de poste</option>';
+        }
+        postesOptions += '<option value="Chef d\'Équipe">Chef d\'Équipe</option>';
+    } else if (niveau === 'SSIAP 3') {
+        // SSIAP 3 = Chef de poste (si pas déjà pris) ou Chef d'Équipe
+        if (!hasChef) {
+            postesOptions += '<option value="Chef de poste">Chef de poste</option>';
+        }
+        postesOptions += '<option value="Chef d\'Équipe">Chef d\'Équipe</option>';
+    }
+
+    posteSelect.innerHTML = postesOptions;
 
     agentSection.style.display = agentsDisponibles.length ? 'block' : 'none';
     posteSection.style.display = agentsDisponibles.length ? 'block' : 'none';
@@ -830,61 +938,352 @@ function filterAgentsList() {
     });
 }
 
-function updateVerifications() {
-    const poste = document.getElementById('ppPoste')?.value;
-    const section = document.getElementById('verificationsSection');
-    if (!section) return;
+// ========== VERIFICATIONS ==========
+// Configuration des vérifications par type de poste
+const VERIFICATIONS_CONFIG = {
+    'Chef de poste': {
+        securite: [
+            'Test de signalisation',
+            'Bilan SSI',
+            'Éclairage de sécurité PC',
+            'Moyens de secours PC'
+        ],
+        techniques: [
+            'Test de ligne directe',
+            'Test TU',
+            'Test radio',
+            'Report alarme technique',
+            'PTI'
+        ],
+        administratives: [
+            'Registre de sécurité',
+            'Consignes particulières',
+            'Consignes générales',
+            'Registre des clés'
+        ]
+    },
+    "Chef d'Équipe": {
+        securite: [],
+        techniques: [
+            'Test radio',
+            'PTI',
+            'Lampe torche',
+            'Trousseau de clés',
+            'Outils de ronde'
+        ],
+        administratives: [
+            'Consignes particulières',
+            'Consignes générales'
+        ]
+    },
+    "Équipier": {
+        securite: [],
+        techniques: [
+            'Test radio',
+            'PTI',
+            'Lampe torche',
+            'Trousseau de clés',
+            'Outils de ronde'
+        ],
+        administratives: [
+            'Consignes particulières',
+            'Consignes générales'
+        ]
+    }
+};
 
-    if (poste === 'Chef de poste') {
-        section.innerHTML = `
-            <div class="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-xl">
-                <div class="font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-clipboard-check text-purple-600"></i>
-                    Vérifications Techniques
-                </div>
-                <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="PTI"> PTI</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Lampe torche"> Lampe torche</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Trousseaux de clés"> Trousseaux de clés</label>
-                </div>
+function renderVerifications() {
+    const agentsEnPoste = getAgentsEnPoste();
+    const agentsSansVerif = agentsEnPoste.filter(a => {
+        const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
+        return pp && !pp.verificationsEffectuees;
+    });
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-clipboard-check mr-2 text-primary-500"></i>Vérifications</h1>
+        </div>
+
+        ${agentsEnPoste.length === 0 ? `
+            <div class="card p-8 text-center">
+                <div class="text-6xl mb-4">👤</div>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Aucun agent en poste</h2>
+                <p class="text-gray-500 mb-4">Un agent doit d'abord effectuer sa prise de poste.</p>
+                <button onclick="navigate('prisePoste')" class="btn btn-primary"><i class="fas fa-user-clock"></i> Aller à Prise de Poste</button>
             </div>
-            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
-                <div class="font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-file-alt text-blue-600"></i>
-                    Vérifications Administratives
+        ` : `
+            <!-- Agents avec vérifications à faire -->
+            ${agentsSansVerif.length > 0 ? `
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        <i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>Vérifications à effectuer (${agentsSansVerif.length})
+                    </h2>
+                    <div class="grid gap-4">
+                        ${agentsSansVerif.map(agent => {
+                            const pp = DB.prisesPoste.find(p => p.agentId === agent.id && !p.finPoste);
+                            return `
+                                <div class="card">
+                                    <div class="gradient-warning text-white p-4 font-semibold flex items-center justify-between rounded-t-2xl">
+                                        <span><i class="fas fa-user mr-2"></i>${agent.prenom} ${agent.nom}</span>
+                                        <span class="badge bg-white/20 text-white">${pp?.poste || 'Agent'}</span>
+                                    </div>
+                                    <div class="p-4">
+                                        <button onclick="ouvrirVerificationsAgent(${agent.id})" class="btn btn-primary w-full">
+                                            <i class="fas fa-clipboard-check"></i> Effectuer les vérifications
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
                 </div>
-                <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes particulières"> Consignes particulières</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes générales"> Consignes générales</label>
+            ` : ''}
+
+            <!-- Agents avec vérifications effectuées -->
+            ${agentsEnPoste.filter(a => {
+                const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
+                return pp && pp.verificationsEffectuees;
+            }).length > 0 ? `
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        <i class="fas fa-check-circle text-green-500 mr-2"></i>Vérifications effectuées
+                    </h2>
+                    <div class="grid gap-3">
+                        ${agentsEnPoste.filter(a => {
+                            const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
+                            return pp && pp.verificationsEffectuees;
+                        }).map(agent => {
+                            const pp = DB.prisesPoste.find(p => p.agentId === agent.id && !p.finPoste);
+                            return `
+                                <div class="card p-4 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center text-white">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-800 dark:text-white">${agent.prenom} ${agent.nom}</div>
+                                            <div class="text-sm text-gray-500">${pp?.poste || 'Agent'}</div>
+                                        </div>
+                                    </div>
+                                    <button onclick="refaireVerifications(${agent.id})" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-redo"></i> Refaire
+                                    </button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
                 </div>
-            </div>
-        `;
-    } else {
-        section.innerHTML = `
-            <div class="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-xl">
-                <div class="font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-clipboard-check text-purple-600"></i>
-                    Vérifications Techniques
+            ` : ''}
+
+            ${agentsSansVerif.length === 0 && agentsEnPoste.every(a => {
+                const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
+                return pp && pp.verificationsEffectuees;
+            }) ? `
+                <div class="card p-8 text-center mt-6">
+                    <div class="text-6xl mb-4">✅</div>
+                    <h2 class="text-xl font-bold text-green-600 mb-2">Toutes les vérifications sont terminées !</h2>
+                    <p class="text-gray-500">Tous les agents en poste ont effectué leurs vérifications.</p>
                 </div>
-                <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Test radio"> Test radio</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Lampe torche"> Lampe torche</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="technique" data-label="Outils de ronde"> Outils de ronde</label>
+            ` : ''}
+        `}
+    `;
+}
+
+function ouvrirVerificationsAgent(agentId) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    const pp = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (!agent || !pp) return;
+
+    const poste = pp.poste;
+    const config = VERIFICATIONS_CONFIG[poste] || VERIFICATIONS_CONFIG["Chef d'Équipe"];
+    const totalVerifs = config.securite.length + config.techniques.length + config.administratives.length;
+
+    // Récupérer les vérifications déjà effectuées
+    const verifsDeja = pp.verifications || { securite: [], techniques: [], administratives: [] };
+
+    // Fonction pour vérifier si un item est déjà coché
+    const isChecked = (category, item) => {
+        if (category === 'securite') return verifsDeja.securite?.includes(item);
+        if (category === 'technique') return verifsDeja.techniques?.includes(item);
+        if (category === 'administrative') return verifsDeja.administratives?.includes(item);
+        return false;
+    };
+
+    // Compter les vérifications déjà faites
+    const dejaFaites = (verifsDeja.securite?.length || 0) + (verifsDeja.techniques?.length || 0) + (verifsDeja.administratives?.length || 0);
+
+    let html = `<div class="space-y-6" id="verificationsForm" data-agent-id="${agentId}">`;
+
+    // Vérifications Sécurité (seulement si il y en a)
+    if (config.securite.length > 0) {
+        html += `
+            <div class="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                    <i class="fas fa-shield-alt"></i>
+                    Vérifications Sécurité
                 </div>
-            </div>
-            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
-                <div class="font-semibold mb-3 flex items-center gap-2">
-                    <i class="fas fa-file-alt text-blue-600"></i>
-                    Vérifications Administratives
-                </div>
-                <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes particulières"> Consignes particulières</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" data-category="administrative" data-label="Consignes générales"> Consignes générales</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${config.securite.map(item => `
+                        <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/50 transition">
+                            <input type="checkbox" class="w-5 h-5 verif-check" data-category="securite" data-label="${item}" ${isChecked('securite', item) ? 'checked' : ''}>
+                            <span>${item}</span>
+                        </label>
+                    `).join('')}
                 </div>
             </div>
         `;
     }
+
+    // Vérifications Techniques
+    if (config.techniques.length > 0) {
+        html += `
+            <div class="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                    <i class="fas fa-tools"></i>
+                    Vérifications Techniques
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${config.techniques.map(item => `
+                        <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition">
+                            <input type="checkbox" class="w-5 h-5 verif-check" data-category="technique" data-label="${item}" ${isChecked('technique', item) ? 'checked' : ''}>
+                            <span>${item}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Vérifications Administratives
+    if (config.administratives.length > 0) {
+        html += `
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
+                <div class="font-semibold mb-3 flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                    <i class="fas fa-file-alt"></i>
+                    Vérifications Administratives
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${config.administratives.map(item => `
+                        <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition">
+                            <input type="checkbox" class="w-5 h-5 verif-check" data-category="administrative" data-label="${item}" ${isChecked('administrative', item) ? 'checked' : ''}>
+                            <span>${item}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+        <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div id="verifCounter" class="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                <span id="verifChecked">${dejaFaites}</span> / <span id="verifTotal">${totalVerifs}</span> vérifications
+            </div>
+        </div>
+    </div>`;
+
+    showModal(`Vérifications - ${agent.prenom} ${agent.nom} (${poste})`, html, () => {
+        enregistrerVerificationsAgent(agentId);
+    });
 }
+
+function refaireVerifications(agentId) {
+    const pp = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (pp) {
+        pp.verificationsEffectuees = false;
+        // On garde les vérifications existantes pour les pré-cocher
+        sauvegarderVersFirebase();
+        navigate('verifications');
+    }
+}
+
+function enregistrerVerificationsAgent(agentId) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    const pp = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (!agent || !pp) return;
+
+    const checkboxes = document.querySelectorAll('.verif-check');
+    const total = checkboxes.length;
+    let checked = 0;
+    const verifications = { securite: [], techniques: [], administratives: [] };
+
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            checked++;
+            const category = cb.getAttribute('data-category');
+            const label = cb.getAttribute('data-label');
+            if (category === 'securite') verifications.securite.push(label);
+            else if (category === 'technique') verifications.techniques.push(label);
+            else verifications.administratives.push(label);
+        }
+    });
+
+    pp.verifications = verifications;
+
+    const allChecked = checked === total;
+    const posteLabel = pp.poste;
+
+    if (allChecked) {
+        pp.verificationsEffectuees = true;
+        addMainCourante('Vérifications', `👍 Toutes les vérifications ${posteLabel} effectuées (${checked}/${total})`, agentId);
+        showToast('✅ Toutes les vérifications sont complètes !', 'success');
+    } else {
+        pp.verificationsEffectuees = false;
+        addMainCourante('Vérifications', `⚠️ Vérifications ${posteLabel} incomplètes (${checked}/${total})`, agentId);
+    }
+
+    sauvegarderVersFirebase();
+    closeModal();
+
+    // Afficher un message d'avertissement si vérifications incomplètes
+    if (!allChecked) {
+        setTimeout(() => {
+            showAlertVerificationsIncompletes(agent, checked, total);
+        }, 100);
+    }
+
+    navigate('verifications');
+}
+
+function showAlertVerificationsIncompletes(agent, checked, total) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-lg w-full mx-4';
+    alertDiv.innerHTML = `
+        <div class="bg-red-100 dark:bg-red-900/50 border-2 border-red-500 rounded-xl p-4 shadow-lg animate-pulse">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white text-xl">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div>
+                    <div class="font-bold text-red-700 dark:text-red-300 text-lg">⚠️ Attention</div>
+                    <div class="text-red-600 dark:text-red-400">
+                        Toutes les vérifications pour l'agent <strong>${agent.prenom} ${agent.nom}</strong> ne sont pas terminées (${checked}/${total})
+                    </div>
+                </div>
+                <button onclick="this.closest('.fixed').remove()" class="ml-auto text-red-500 hover:text-red-700 text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(alertDiv);
+
+    // Auto-fermeture après 8 secondes
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 8000);
+}
+
+// Mise à jour du compteur en temps réel
+document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('verif-check')) {
+        const checked = document.querySelectorAll('.verif-check:checked').length;
+        const checkedEl = document.getElementById('verifChecked');
+        if (checkedEl) checkedEl.textContent = checked;
+    }
+});
 
 function finPoste(id) {
     showConfirm('Confirmer la fin de poste ?', () => {
@@ -904,10 +1303,12 @@ const typesRondes = ['Ouverture', 'Fermeture', 'Vérification moyens de secours'
 
 function renderRondes() {
     const isSsiap2 = currentUser?.qualification === 'SSIAP 2';
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
+    const isReadOnly = isSsiap2 || isSsiap3;
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-route mr-2 text-primary-500"></i>Rondes</h1>
-            ${isSsiap2 ? '' : '<button onclick="showModalRonde()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>'}
+            ${isReadOnly ? '' : '<button onclick="showModalRonde()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>'}
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -944,7 +1345,7 @@ function renderRondes() {
                                 <div class="text-sm text-gray-500">${agent?.prenom} ${agent?.nom} • ${formatDateTime(r.heureDebut)}</div>
                             </div>
                             <div class="flex gap-2">
-                                ${!r.heureFin && !isSsiap2 ? `<button onclick="finRonde(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Terminer</button>` : ''}
+                                ${!r.heureFin && !isReadOnly ? `<button onclick="finRonde(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Terminer</button>` : ''}
                                 <button onclick="voirRonde(${r.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
@@ -1097,11 +1498,12 @@ const typesEvt = ['Alarme Incendie', 'Secours à personne', 'Problème technique
 function renderEvenements() {
     const evtsActifs = DB.evenements.filter(e => e.statut !== 'Terminé');
     const evtsTermines = DB.evenements.filter(e => e.statut === 'Terminé');
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
 
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-exclamation-triangle mr-2 text-primary-500"></i>Événements</h1>
-            <button onclick="showModalEvenement()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel événement</button>
+            ${isSsiap3 ? '' : '<button onclick="showModalEvenement()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel événement</button>'}
         </div>
 
         <div class="grid grid-cols-3 gap-4 mb-6">
@@ -1140,6 +1542,7 @@ function renderEvenements() {
 function renderEvenementCard(e) {
     const agent = DB.agents.find(a => a.id === e.agentId);
     const suiviCount = e.suivis?.length || 0;
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
             <div class="flex items-center gap-4">
@@ -1155,7 +1558,7 @@ function renderEvenementCard(e) {
             </div>
             <div class="flex gap-2">
                 <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i> Voir</button>
-                ${e.statut !== 'Terminé' ? `<button onclick="ajouterSuivi(${e.id})" class="btn btn-warning btn-sm"><i class="fas fa-plus"></i> Suivi</button>` : ''}
+                ${e.statut !== 'Terminé' && !isSsiap3 ? `<button onclick="ajouterSuivi(${e.id})" class="btn btn-warning btn-sm"><i class="fas fa-plus"></i> Suivi</button>` : ''}
             </div>
         </div>
     `;
@@ -1282,7 +1685,7 @@ function voirEvenement(id) {
             ${suiviHtml}
             ${compteRenduHtml}
 
-            ${e.statut !== 'Terminé' ? `
+            ${e.statut !== 'Terminé' && currentUser?.qualification !== 'SSIAP 3' ? `
                 <div class="flex gap-2 pt-4 border-t border-gray-200 dark:border-slate-600">
                     <button onclick="closeModal(); ajouterSuivi(${e.id})" class="btn btn-warning flex-1"><i class="fas fa-plus"></i> Ajouter suivi</button>
                     <button onclick="closeModal(); terminerEvenement(${e.id})" class="btn btn-success flex-1"><i class="fas fa-check"></i> Terminer</button>
@@ -1401,53 +1804,165 @@ function terminerEvenement(id) {
 }
 
 // ========== MATÉRIELS ==========
-const typesMat = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'Désenfumage', 'Éclairage', 'Signalisation'];
-const statutsMat = ['Opérationnel', 'À vérifier', 'En maintenance', 'Hors service'];
+const typesMat = ['Extincteur', 'Porte Coupe-Feu', 'Alarme Incendie', 'Éclairage de Secours', 'Désenfumage', 'Sprinkler', 'Robinet Incendie', 'RIA', 'Détecteur', 'Signalisation', 'Autre'];
+const statutsMat = ['Opérationnel', 'Défaillant', 'En Maintenance', 'Hors Service'];
+
+// Variables de filtres pour les matériels
+let filtreMatRecherche = '';
+let filtreMatType = '';
+let filtreMatStatut = '';
+let filtreMatLocalisation = '';
 
 function renderMateriels() {
-    const stats = { ok: 0, warn: 0, hs: 0 };
+    const stats = { total: 0, ok: 0, defaillant: 0, hs: 0, maintenance: 0 };
     DB.materiels.forEach(m => {
+        stats.total++;
         if (m.statut === 'Opérationnel') stats.ok++;
-        else if (m.statut === 'Hors service') stats.hs++;
-        else stats.warn++;
+        else if (m.statut === 'Défaillant') stats.defaillant++;
+        else if (m.statut === 'Hors Service') stats.hs++;
+        else if (m.statut === 'En Maintenance') stats.maintenance++;
+    });
+    const canEdit = currentUser?.qualification === 'SSIAP 2';
+
+    // Extraire les localisations uniques
+    const localisations = [...new Set(DB.materiels.map(m => m.localisation).filter(Boolean))].sort();
+
+    // Filtrer les matériels
+    const materielsFiltres = DB.materiels.filter(m => {
+        const matchRecherche = !filtreMatRecherche ||
+            m.nom.toLowerCase().includes(filtreMatRecherche.toLowerCase()) ||
+            (m.localisation && m.localisation.toLowerCase().includes(filtreMatRecherche.toLowerCase())) ||
+            (m.codeQR && m.codeQR.toLowerCase().includes(filtreMatRecherche.toLowerCase()));
+        const matchType = !filtreMatType || m.type === filtreMatType;
+        const matchStatut = !filtreMatStatut || m.statut === filtreMatStatut;
+        const matchLoc = !filtreMatLocalisation || m.localisation === filtreMatLocalisation;
+        return matchRecherche && matchType && matchStatut && matchLoc;
     });
 
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-fire-extinguisher mr-2 text-primary-500"></i>Matériels</h1>
-            <div class="flex gap-2">
-                <button onclick="imprimerQRCodes()" class="btn btn-secondary no-print"><i class="fas fa-print"></i> Imprimer QR Codes</button>
-                <button onclick="showModalMateriel()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau matériel</button>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <i class="fas fa-fire-extinguisher text-primary-500"></i>
+                    Gestion des Matériels
+                </h1>
+                <p class="text-gray-500 text-sm mt-1">${stats.total} matériel(s) • ${stats.defaillant} défaillant(s)</p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="genererRapportMateriels()" class="btn btn-success btn-sm no-print"><i class="fas fa-file-alt"></i> Rapport</button>
+                <button onclick="imprimerQRCodes()" class="btn btn-warning btn-sm no-print"><i class="fas fa-print"></i> Imprimer</button>
+                ${canEdit ? '<button onclick="showModalMateriel()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Nouveau Matériel</button>' : ''}
             </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="stat-card bg-green-50 dark:bg-green-900/30"><div class="value text-green-600">${stats.ok}</div><div class="label">Opérationnels</div></div>
-            <div class="stat-card bg-orange-50 dark:bg-orange-900/30"><div class="value text-orange-600">${stats.warn}</div><div class="label">À vérifier</div></div>
-            <div class="stat-card bg-red-50 dark:bg-red-900/30"><div class="value text-red-600">${stats.hs}</div><div class="label">Hors service</div></div>
+        <!-- Statistiques avec points colorés -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Total</div>
+                    <div class="text-2xl font-bold text-gray-800 dark:text-white">${stats.total}</div>
+                </div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-green-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Opérationnels</div>
+                    <div class="text-2xl font-bold text-green-600">${stats.ok}</div>
+                </div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-red-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Défaillants</div>
+                    <div class="text-2xl font-bold text-red-600">${stats.defaillant}</div>
+                </div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-gray-800 dark:bg-gray-400"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Hors Service</div>
+                    <div class="text-2xl font-bold text-gray-800 dark:text-gray-300">${stats.hs}</div>
+                </div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-orange-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Maintenance</div>
+                    <div class="text-2xl font-bold text-orange-600">${stats.maintenance}</div>
+                </div>
+            </div>
         </div>
 
+        <!-- Barre de recherche et filtres -->
+        <div class="card mb-6">
+            <div class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-search mr-1"></i>Rechercher</label>
+                        <input type="text" id="matRecherche" class="input" placeholder="Nom, localisation, QR code..." value="${filtreMatRecherche}" oninput="filtrerMateriels()">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-filter mr-1"></i>Type</label>
+                        <select id="matFiltreType" class="input" onchange="filtrerMateriels()">
+                            <option value="">Tous les types</option>
+                            ${typesMat.map(t => `<option value="${t}" ${filtreMatType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-info-circle mr-1"></i>Statut</label>
+                        <select id="matFiltreStatut" class="input" onchange="filtrerMateriels()">
+                            <option value="">Tous les statuts</option>
+                            ${statutsMat.map(s => `<option value="${s}" ${filtreMatStatut === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt mr-1"></i>Localisation</label>
+                        <select id="matFiltreLoc" class="input" onchange="filtrerMateriels()">
+                            <option value="">Toutes les localisations</option>
+                            ${localisations.map(l => `<option value="${l}" ${filtreMatLocalisation === l ? 'selected' : ''}>${l}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="reinitialiserFiltresMateriels()" class="btn btn-secondary w-full"><i class="fas fa-undo mr-1"></i>Réinitialiser</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tableau des matériels -->
         <div class="card">
             <div class="overflow-x-auto">
                 <table class="table">
-                    <thead><tr><th>Matériel</th><th>Localisation</th><th>Statut</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        ${DB.materiels.map(m => {
-                            const sClass = { Opérationnel: 'success', 'À vérifier': 'warning', 'En maintenance': 'info', 'Hors service': 'danger' }[m.statut];
+                    <thead>
+                        <tr>
+                            <th>NOM</th>
+                            <th>LOCALISATION</th>
+                            <th>ÉTAT</th>
+                            <th>ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableMateriels">
+                        ${materielsFiltres.length ? materielsFiltres.map(m => {
+                            const sClass = { 'Opérationnel': 'success', 'Défaillant': 'danger', 'En Maintenance': 'warning', 'Hors Service': 'danger' }[m.statut] || 'secondary';
                             return `
-                                <tr>
-                                    <td><div class="font-medium">${m.nom}</div><div class="text-sm text-gray-500">${m.type}</div></td>
-                                    <td>${m.localisation}</td>
+                                <tr class="hover:bg-gray-50 dark:hover:bg-slate-700">
+                                    <td>
+                                        <div class="font-semibold text-gray-800 dark:text-white">${m.nom}</div>
+                                        <div class="text-sm text-gray-500">${m.type}</div>
+                                    </td>
+                                    <td class="text-gray-600 dark:text-gray-400">${m.localisation || '-'}</td>
                                     <td><span class="badge badge-${sClass}">${m.statut}</span></td>
                                     <td>
                                         <div class="flex gap-1">
-                                            <button onclick="genQR(${m.id})" class="btn btn-icon btn-secondary btn-sm"><i class="fas fa-qrcode"></i></button>
-                                            <button onclick="editMat(${m.id})" class="btn btn-icon btn-secondary btn-sm"><i class="fas fa-edit"></i></button>
+                                            <button onclick="voirMateriel(${m.id})" class="btn btn-icon btn-sm" style="background:#10b981;color:white" title="Voir"><i class="fas fa-eye"></i></button>
+                                            <button onclick="editMat(${m.id})" class="btn btn-icon btn-sm" style="background:#3b82f6;color:white" title="Modifier"><i class="fas fa-edit"></i></button>
+                                            ${canEdit ? `<button onclick="supprimerMateriel(${m.id})" class="btn btn-icon btn-sm" style="background:#ef4444;color:white" title="Supprimer"><i class="fas fa-trash"></i></button>` : ''}
                                         </div>
                                     </td>
                                 </tr>
                             `;
-                        }).join('')}
+                        }).join('') : '<tr><td colspan="4" class="text-center text-gray-500 py-8">Aucun matériel trouvé</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -1455,20 +1970,136 @@ function renderMateriels() {
     `;
 }
 
+function filtrerMateriels() {
+    filtreMatRecherche = document.getElementById('matRecherche')?.value || '';
+    filtreMatType = document.getElementById('matFiltreType')?.value || '';
+    filtreMatStatut = document.getElementById('matFiltreStatut')?.value || '';
+    filtreMatLocalisation = document.getElementById('matFiltreLoc')?.value || '';
+    navigate('materiels');
+}
+
+function reinitialiserFiltresMateriels() {
+    filtreMatRecherche = '';
+    filtreMatType = '';
+    filtreMatStatut = '';
+    filtreMatLocalisation = '';
+    navigate('materiels');
+}
+
+function genererRapportMateriels() {
+    const stats = { total: 0, ok: 0, defaillant: 0, hs: 0, maintenance: 0 };
+    DB.materiels.forEach(m => {
+        stats.total++;
+        if (m.statut === 'Opérationnel') stats.ok++;
+        else if (m.statut === 'Défaillant') stats.defaillant++;
+        else if (m.statut === 'Hors Service') stats.hs++;
+        else if (m.statut === 'En Maintenance') stats.maintenance++;
+    });
+
+    const defaillants = DB.materiels.filter(m => m.statut === 'Défaillant');
+    const horsService = DB.materiels.filter(m => m.statut === 'Hors Service');
+    const maintenanceProche = DB.materiels.filter(m => {
+        if (!m.prochaineMaint) return false;
+        const prochaine = new Date(m.prochaineMaint);
+        const maintenant = new Date();
+        const diff = (prochaine - maintenant) / (1000 * 60 * 60 * 24);
+        return diff <= 30 && diff >= 0;
+    });
+
+    showModal('Rapport des Matériels', `
+        <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
+                <h3 class="font-bold mb-3">📊 Statistiques globales</h3>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>Total: <strong>${stats.total}</strong></div>
+                    <div class="text-green-600">Opérationnels: <strong>${stats.ok}</strong></div>
+                    <div class="text-red-600">Défaillants: <strong>${stats.defaillant}</strong></div>
+                    <div class="text-gray-800 dark:text-gray-300">Hors Service: <strong>${stats.hs}</strong></div>
+                    <div class="text-orange-600">En Maintenance: <strong>${stats.maintenance}</strong></div>
+                </div>
+            </div>
+
+            ${defaillants.length ? `
+            <div class="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl">
+                <h3 class="font-bold mb-3 text-red-700 dark:text-red-400">⚠️ Matériels défaillants (${defaillants.length})</h3>
+                <ul class="text-sm space-y-1">
+                    ${defaillants.map(m => `<li>• ${m.nom} - ${m.localisation}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            ${horsService.length ? `
+            <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl">
+                <h3 class="font-bold mb-3 text-gray-800 dark:text-gray-300">🚫 Matériels hors service (${horsService.length})</h3>
+                <ul class="text-sm space-y-1">
+                    ${horsService.map(m => `<li>• ${m.nom} - ${m.localisation}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            ${maintenanceProche.length ? `
+            <div class="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-xl">
+                <h3 class="font-bold mb-3 text-orange-700 dark:text-orange-400">🔧 Maintenance à prévoir (30 jours) - ${maintenanceProche.length}</h3>
+                <ul class="text-sm space-y-1">
+                    ${maintenanceProche.map(m => `<li>• ${m.nom} - ${formatDate(m.prochaineMaint)}</li>`).join('')}
+                </ul>
+            </div>
+            ` : '<div class="bg-green-50 dark:bg-green-900/30 p-4 rounded-xl text-green-700">✅ Aucune maintenance prévue dans les 30 prochains jours</div>'}
+
+            <div class="text-xs text-gray-500 text-right">Rapport généré le ${formatDateTime(new Date())}</div>
+        </div>
+    `, null, 'Fermer');
+}
+
 function showModalMateriel() {
+    const codeQR = 'MAT-' + Date.now();
     showModal('Nouveau Matériel', `
         <div class="space-y-4">
-            <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="matNom" class="input"></div>
+            <div><label class="block text-sm font-semibold mb-2">Nom du matériel *</label><input type="text" id="matNom" class="input" placeholder="Ex: Extincteur CO2 5kg - Hall"></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Type</label><select id="matType" class="input">${typesMat.map(t => `<option>${t}</option>`).join('')}</select></div>
-                <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="matStatut" class="input">${statutsMat.map(s => `<option>${s}</option>`).join('')}</select></div>
+                <div><label class="block text-sm font-semibold mb-2">Type *</label><select id="matType" class="input"><option value="">Sélectionner un type</option>${typesMat.map(t => `<option>${t}</option>`).join('')}</select></div>
+                <div><label class="block text-sm font-semibold mb-2">Statut *</label><select id="matStatut" class="input">${statutsMat.map(s => `<option>${s}</option>`).join('')}</select></div>
             </div>
-            <div><label class="block text-sm font-semibold mb-2">Localisation</label><input type="text" id="matLoc" class="input"></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Localisation *</label><input type="text" id="matLoc" class="input" placeholder="Ex: Hall Entrée - Zone A"></div>
+                <div><label class="block text-sm font-semibold mb-2">Code QR</label><input type="text" id="matCodeQR" class="input bg-gray-100 dark:bg-slate-700" value="${codeQR}" readonly></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Numéro de série</label><input type="text" id="matNumSerie" class="input" placeholder="Optionnel"></div>
+                <div><label class="block text-sm font-semibold mb-2">Fabricant</label><input type="text" id="matFabricant" class="input" placeholder="Optionnel"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Dernière maintenance</label><input type="date" id="matDernMaint" class="input"></div>
+                <div><label class="block text-sm font-semibold mb-2">Prochaine maintenance</label><input type="date" id="matProchMaint" class="input"></div>
+            </div>
+            <div><label class="block text-sm font-semibold mb-2">Description</label><textarea id="matDesc" class="input" rows="3" placeholder="Informations complémentaires..."></textarea></div>
         </div>
     `, () => {
         const nom = document.getElementById('matNom').value;
+        const type = document.getElementById('matType').value;
+        const localisation = document.getElementById('matLoc').value;
         if (!nom) return showToast('Entrez un nom', 'error');
-        DB.materiels.push({ id: genId(), nom, type: document.getElementById('matType').value, statut: document.getElementById('matStatut').value, localisation: document.getElementById('matLoc').value });
+        if (!type) return showToast('Sélectionnez un type', 'error');
+        if (!localisation) return showToast('Entrez une localisation', 'error');
+
+        DB.materiels.push({
+            id: genId(),
+            nom,
+            type,
+            statut: document.getElementById('matStatut').value,
+            localisation,
+            codeQR: document.getElementById('matCodeQR').value,
+            numeroSerie: document.getElementById('matNumSerie').value,
+            fabricant: document.getElementById('matFabricant').value,
+            derniereMaint: document.getElementById('matDernMaint').value || null,
+            prochaineMaint: document.getElementById('matProchMaint').value || null,
+            description: document.getElementById('matDesc').value,
+            dateCreation: new Date().toISOString(),
+            creePar: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système'
+        });
+
+        addMainCourante('Matériel', `Création: ${nom} (${type})`, currentUser?.id);
+        sauvegarderVersFirebase();
         closeModal();
         showToast('Matériel créé');
         navigate('materiels');
@@ -1483,48 +2114,265 @@ function genQR(id) {
 
 function editMat(id) {
     const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
     showModal('Modifier Matériel', `
         <div class="space-y-4">
-            <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="editMatNom" class="input" value="${m.nom}"></div>
-            <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="editMatStatut" class="input">${statutsMat.map(s => `<option ${m.statut === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
-            <div><label class="block text-sm font-semibold mb-2">Observation</label><textarea id="editMatObs" class="input" rows="3" placeholder="Note sur l'état du matériel...">${m.observation || ''}</textarea></div>
+            <!-- QR Code du matériel -->
+            <div class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
+                <div id="editMatQRCode" class="flex-shrink-0"></div>
+                <div>
+                    <div class="font-bold text-lg text-gray-800 dark:text-white">${m.nom}</div>
+                    <div class="text-sm text-gray-500">${m.type}</div>
+                    <div class="text-xs text-gray-400 font-mono mt-1">${m.codeQR || 'Aucun code QR'}</div>
+                </div>
+            </div>
+
+            <div><label class="block text-sm font-semibold mb-2">Nom du matériel *</label><input type="text" id="editMatNom" class="input" value="${m.nom}"></div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Type *</label><select id="editMatType" class="input">${typesMat.map(t => `<option ${m.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+                <div><label class="block text-sm font-semibold mb-2">Statut *</label><select id="editMatStatut" class="input">${statutsMat.map(s => `<option ${m.statut === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Localisation *</label><input type="text" id="editMatLoc" class="input" value="${m.localisation || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Code QR</label><input type="text" id="editMatCodeQR" class="input bg-gray-100 dark:bg-slate-600" value="${m.codeQR || ''}" readonly></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Numéro de série</label><input type="text" id="editMatNumSerie" class="input" value="${m.numeroSerie || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Fabricant</label><input type="text" id="editMatFabricant" class="input" value="${m.fabricant || ''}"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Dernière maintenance</label><input type="date" id="editMatDernMaint" class="input" value="${m.derniereMaint || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Prochaine maintenance</label><input type="date" id="editMatProchMaint" class="input" value="${m.prochaineMaint || ''}"></div>
+            </div>
+
+            <div><label class="block text-sm font-semibold mb-2">Description</label><textarea id="editMatDesc" class="input" rows="2">${m.description || ''}</textarea></div>
+
+            <div><label class="block text-sm font-semibold mb-2">Observation / Note</label><textarea id="editMatObs" class="input" rows="2" placeholder="Note sur l'état actuel du matériel...">${m.observation || ''}</textarea></div>
         </div>
     `, () => {
-        m.nom = document.getElementById('editMatNom').value;
-        m.statut = document.getElementById('editMatStatut').value;
-        m.observation = document.getElementById('editMatObs').value;
+        const nom = document.getElementById('editMatNom').value;
+        const localisation = document.getElementById('editMatLoc').value;
+        if (!nom) return showToast('Entrez un nom', 'error');
+        if (!localisation) return showToast('Entrez une localisation', 'error');
+
+        const ancienStatut = m.statut;
+        const nouveauStatut = document.getElementById('editMatStatut').value;
+        const observation = document.getElementById('editMatObs').value;
+
+        m.nom = nom;
+        m.type = document.getElementById('editMatType').value;
+        m.statut = nouveauStatut;
+        m.localisation = localisation;
+        m.numeroSerie = document.getElementById('editMatNumSerie').value;
+        m.fabricant = document.getElementById('editMatFabricant').value;
+        m.derniereMaint = document.getElementById('editMatDernMaint').value || null;
+        m.prochaineMaint = document.getElementById('editMatProchMaint').value || null;
+        m.description = document.getElementById('editMatDesc').value;
+        m.observation = observation;
+        m.dateModification = new Date().toISOString();
+        m.modifiePar = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système';
+
+        // Création automatique d'une consigne particulière si mise Hors Service
+        if (nouveauStatut === 'Hors Service' && ancienStatut !== 'Hors Service') {
+            const nouvelleConsigne = {
+                id: genId(),
+                titre: `${m.nom} - HORS SERVICE`,
+                niveau: 'Particulière',
+                destinataire: 'Tout le monde',
+                priorite: 'Haute',
+                contenu: `⚠️ MATÉRIEL HORS SERVICE\n\nType: ${m.type}\nLocalisation: ${m.localisation}\n\n${observation ? 'Observations:\n' + observation : 'Aucune observation'}\n\nMis hors service le ${new Date().toLocaleDateString('fr-FR')} par ${currentUser ? currentUser.prenom + ' ' + currentUser.nom : 'Système'}`,
+                dateDebut: new Date().toISOString().split('T')[0],
+                dateFin: null,
+                active: true,
+                materielId: m.id,
+                creePar: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+                dateCreation: new Date().toISOString()
+            };
+            DB.consignes.push(nouvelleConsigne);
+            addMainCourante('Consigne', `Création automatique: ${nouvelleConsigne.titre} (Matériel HS)`, currentUser?.id);
+            showToast('⚠️ Consigne particulière créée automatiquement', 'warning');
+        }
+
+        addMainCourante('Matériel', `Modification: ${m.nom} (${m.type}) - Statut: ${nouveauStatut}`, currentUser?.id);
+        sauvegarderVersFirebase();
         closeModal();
         showToast('Matériel modifié');
+        navigate('materiels');
+    });
+
+    // Générer le QR Code après l'affichage du modal
+    setTimeout(() => {
+        const qrDiv = document.getElementById('editMatQRCode');
+        if (qrDiv && typeof QRCode !== 'undefined') {
+            new QRCode(qrDiv, {
+                text: m.codeQR || `MATERIEL:${m.id}`,
+                width: 80,
+                height: 80
+            });
+        }
+    }, 100);
+}
+
+function voirMateriel(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    const sClass = { 'Opérationnel': 'success', 'Défaillant': 'warning', 'En Maintenance': 'info', 'Hors Service': 'danger' }[m.statut] || 'secondary';
+
+    showModal(`Fiche Matériel`, `
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white">${m.nom}</h3>
+                <span class="badge badge-${sClass} text-sm">${m.statut}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Type</div>
+                    <div class="font-medium">${m.type}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Localisation</div>
+                    <div class="font-medium">${m.localisation || '-'}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Code QR</div>
+                    <div class="font-medium font-mono text-sm">${m.codeQR || '-'}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">N° de série</div>
+                    <div class="font-medium">${m.numeroSerie || '-'}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Fabricant</div>
+                    <div class="font-medium">${m.fabricant || '-'}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Date création</div>
+                    <div class="font-medium">${m.dateCreation ? formatDate(m.dateCreation) : '-'}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                    <div class="text-xs text-green-600 uppercase mb-1">Dernière maintenance</div>
+                    <div class="font-medium text-green-700 dark:text-green-400">${m.derniereMaint ? formatDate(m.derniereMaint) : 'Non renseignée'}</div>
+                </div>
+                <div class="bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
+                    <div class="text-xs text-orange-600 uppercase mb-1">Prochaine maintenance</div>
+                    <div class="font-medium text-orange-700 dark:text-orange-400">${m.prochaineMaint ? formatDate(m.prochaineMaint) : 'Non planifiée'}</div>
+                </div>
+            </div>
+
+            ${m.description ? `
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Description</div>
+                    <div class="text-sm">${m.description}</div>
+                </div>
+            ` : ''}
+
+            ${m.observation ? `
+                <div class="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg">
+                    <div class="text-xs text-yellow-600 uppercase mb-1">Observation</div>
+                    <div class="text-sm">${m.observation}</div>
+                </div>
+            ` : ''}
+
+            ${m.creePar ? `<div class="text-xs text-gray-400 text-right">Créé par: ${m.creePar}</div>` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function supprimerMateriel(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    showConfirm(`Êtes-vous sûr de vouloir supprimer "${m.nom}" ?`, () => {
+        // Enregistrer l'horodatage et qui a supprimé
+        const dateSuppression = new Date().toISOString();
+        const supprimePar = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Inconnu';
+
+        // Ajouter à la main courante
+        addMainCourante('Matériel', `🗑️ Suppression: ${m.nom} (${m.type}) - ${m.localisation}`, currentUser?.id);
+
+        // Supprimer le matériel
+        const index = DB.materiels.findIndex(x => x.id === id);
+        if (index > -1) {
+            DB.materiels.splice(index, 1);
+        }
+
+        sauvegarderVersFirebase();
+        showToast('Matériel supprimé');
         navigate('materiels');
     });
 }
 
 function imprimerQRCodes() {
-    const materielsHTML = DB.materiels.map(m =>
+    // Appliquer les mêmes filtres que l'affichage
+    const materielsFiltres = DB.materiels.filter(m => {
+        const matchRecherche = !filtreMatRecherche ||
+            m.nom.toLowerCase().includes(filtreMatRecherche.toLowerCase()) ||
+            (m.localisation && m.localisation.toLowerCase().includes(filtreMatRecherche.toLowerCase())) ||
+            (m.codeQR && m.codeQR.toLowerCase().includes(filtreMatRecherche.toLowerCase()));
+        const matchType = !filtreMatType || m.type === filtreMatType;
+        const matchStatut = !filtreMatStatut || m.statut === filtreMatStatut;
+        const matchLoc = !filtreMatLocalisation || m.localisation === filtreMatLocalisation;
+        return matchRecherche && matchType && matchStatut && matchLoc;
+    });
+
+    if (materielsFiltres.length === 0) {
+        showToast('Aucun matériel à imprimer avec les filtres actuels', 'error');
+        return;
+    }
+
+    // Construire le titre avec les filtres appliqués
+    let filtresAppliques = [];
+    if (filtreMatType) filtresAppliques.push('Type: ' + filtreMatType);
+    if (filtreMatStatut) filtresAppliques.push('Statut: ' + filtreMatStatut);
+    if (filtreMatLocalisation) filtresAppliques.push('Localisation: ' + filtreMatLocalisation);
+    if (filtreMatRecherche) filtresAppliques.push('Recherche: "' + filtreMatRecherche + '"');
+    const sousTitre = filtresAppliques.length > 0 ? '<p style="text-align: center; color: #666; margin-bottom: 20px;">Filtres: ' + filtresAppliques.join(' | ') + '</p>' : '';
+
+    const materielsHTML = materielsFiltres.map(m =>
         '<div class="qr-card">' +
             '<div class="qr-code" id="qr-' + m.id + '"></div>' +
             '<div style="font-weight: bold; margin: 10px 0;">' + m.nom + '</div>' +
             '<div style="font-size: 12px; color: #666;">' + m.type + '</div>' +
             '<div style="font-size: 12px; color: #666;">' + m.localisation + '</div>' +
+            '<div style="font-size: 11px; color: #999; margin-top: 5px;">' + (m.statut || '') + '</div>' +
         '</div>'
     ).join('');
 
-    const qrCodeScripts = DB.materiels.map(m =>
-        'new QRCode(document.getElementById(\'qr-' + m.id + '\'), { text: \'MATERIEL:' + m.id + '\', width: 150, height: 150 });'
+    const qrCodeScripts = materielsFiltres.map(m =>
+        'new QRCode(document.getElementById(\'qr-' + m.id + '\'), { text: \'' + (m.codeQR || 'MATERIEL:' + m.id) + '\', width: 150, height: 150 });'
     ).join('\n');
 
     const content = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
         '<title>QR Codes Matériels</title>' +
-        '<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"><\/script>' +
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>' +
         '<style>' +
         'body { font-family: Arial, sans-serif; padding: 20px; }' +
         '.qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }' +
         '.qr-card { padding: 15px; border: 2px solid #333; border-radius: 8px; text-align: center; page-break-inside: avoid; }' +
         '.qr-code { margin: 10px 0; }' +
         'h1 { text-align: center; }' +
+        '.info { text-align: center; margin-bottom: 20px; color: #333; }' +
         '@media print { .no-print { display: none; } }' +
         '<\/style><\/head><body>' +
         '<h1>QR Codes - Matériels de Sécurité<\/h1>' +
+        sousTitre +
+        '<p class="info">' + materielsFiltres.length + ' matériel(s) - Imprimé le ' + new Date().toLocaleDateString('fr-FR') + '<\/p>' +
         '<button class="no-print" onclick="window.print()" style="margin: 20px auto; display: block; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer;">Imprimer<\/button>' +
         '<div class="qr-grid">' + materielsHTML + '<\/div>' +
         '<script>' + qrCodeScripts + '<\/script>' +
@@ -1676,8 +2524,8 @@ function renderAgents() {
                                 <td>${a.entreprise}</td>
                                 <td><span class="badge ${a.actif ? 'badge-success' : 'badge-danger'}">${a.actif ? 'Actif' : 'Inactif'}</span></td>
                                 <td>
-                                    <button onclick="toggleAgent(${a.id})" class="btn btn-sm ${a.actif ? 'btn-warning' : 'btn-success'}">
-                                        <i class="fas ${a.actif ? 'fa-ban' : 'fa-check'}"></i>
+                                    <button onclick="voirAgent(${a.id})" class="btn btn-icon btn-secondary btn-sm" title="Voir la fiche">
+                                        <i class="fas fa-eye"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -1687,6 +2535,99 @@ function renderAgents() {
             </div>
         </div>
     `;
+}
+
+function voirAgent(id) {
+    const a = DB.agents.find(x => x.id === id);
+    if (!a) return;
+
+    showModal('Fiche Agent', `
+        <div class="space-y-4">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-16 h-16 rounded-xl gradient-header flex items-center justify-center text-white text-2xl font-semibold">${a.prenom[0]}${a.nom[0]}</div>
+                <div>
+                    <div class="text-xl font-bold text-gray-800 dark:text-white">${a.prenom} ${a.nom}</div>
+                    <span class="badge badge-info">${a.qualification}</span>
+                    <span class="badge ${a.actif ? 'badge-success' : 'badge-danger'} ml-2">${a.actif ? 'Actif' : 'Inactif'}</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Prénom</label><input type="text" id="editAgentPrenom" class="input" value="${a.prenom}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="editAgentNom" class="input" value="${a.nom}"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Qualification</label>
+                    <select id="editAgentQualif" class="input">
+                        <option ${a.qualification === 'SSIAP 1' ? 'selected' : ''}>SSIAP 1</option>
+                        <option ${a.qualification === 'SSIAP 2' ? 'selected' : ''}>SSIAP 2</option>
+                        <option ${a.qualification === 'SSIAP 3' ? 'selected' : ''}>SSIAP 3</option>
+                    </select>
+                </div>
+                <div><label class="block text-sm font-semibold mb-2">Entreprise</label><input type="text" id="editAgentEntr" class="input" value="${a.entreprise}"></div>
+            </div>
+
+            <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="editAgentEmail" class="input" value="${a.email || ''}"></div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Date diplôme</label><input type="date" id="editAgentDiplome" class="input" value="${a.dateDiplome || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Date dernier recyclage</label><input type="date" id="editAgentRecyclage" class="input" value="${a.dateRecyclage || ''}"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="editAgentDebutContrat" class="input" value="${a.dateDebutContrat || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Date fin contrat</label><input type="date" id="editAgentFinContrat" class="input" value="${a.dateFinContrat || ''}"></div>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="editAgentActif" class="w-5 h-5" ${a.actif ? 'checked' : ''}>
+                    <span class="text-sm font-semibold">Agent actif</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-2">Cochez pour activer l'agent, décochez pour le désactiver</p>
+            </div>
+        </div>
+    `, () => {
+        const prenom = document.getElementById('editAgentPrenom').value;
+        const nom = document.getElementById('editAgentNom').value;
+        const email = document.getElementById('editAgentEmail').value;
+        if (!prenom || !nom) return showToast('Remplissez les champs obligatoires', 'error');
+
+        a.prenom = prenom;
+        a.nom = nom;
+        a.qualification = document.getElementById('editAgentQualif').value;
+        a.entreprise = document.getElementById('editAgentEntr').value;
+        a.email = email;
+        a.dateDiplome = document.getElementById('editAgentDiplome').value || null;
+        a.dateRecyclage = document.getElementById('editAgentRecyclage').value || null;
+        a.dateDebutContrat = document.getElementById('editAgentDebutContrat').value || null;
+        a.dateFinContrat = document.getElementById('editAgentFinContrat').value || null;
+
+        const nouveauStatut = document.getElementById('editAgentActif').checked;
+
+        // Vérifier si on active un agent avec recyclage expiré
+        if (nouveauStatut && !a.actif && a.dateRecyclage) {
+            const maintenant = new Date();
+            const troixAnsEnMs = 3 * 365 * 24 * 60 * 60 * 1000;
+            const dateRecyclage = new Date(a.dateRecyclage);
+            const diff = maintenant - dateRecyclage;
+
+            if (diff > troixAnsEnMs) {
+                showToast('Attention: le recyclage de cet agent est expiré. Mettez à jour la date de recyclage.', 'error');
+                return;
+            }
+        }
+
+        a.actif = nouveauStatut;
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Agent modifié');
+        navigate('agents');
+        initLogin();
+    }, 'Enregistrer');
 }
 
 function showModalAgent() {
@@ -1740,13 +2681,6 @@ function showModalAgent() {
     });
 }
 
-function toggleAgent(id) {
-    const a = DB.agents.find(x => x.id === id);
-    a.actif = !a.actif;
-    showToast(`Agent ${a.actif ? 'activé' : 'désactivé'}`);
-    navigate('agents');
-    initLogin();
-}
 
 // ========== MODALS ==========
 function showModal(title, content, onConfirm, confirmText = 'Confirmer') {
@@ -1781,7 +2715,8 @@ function closeModal() {
 
 function showToast(msg, type = 'success') {
     const t = document.createElement('div');
-    t.className = `fixed bottom-4 right-4 px-5 py-3 rounded-xl text-white font-medium shadow-lg z-50 fade-in ${type === 'error' ? 'bg-red-500' : 'gradient-success'}`;
+    t.className = `fixed bottom-4 right-4 px-5 py-3 rounded-xl text-white font-medium shadow-lg fade-in ${type === 'error' ? 'bg-red-500' : 'gradient-success'}`;
+    t.style.zIndex = '9999';
     t.innerHTML = `<i class="fas ${type === 'error' ? 'fa-times-circle' : 'fa-check-circle'} mr-2"></i>${msg}`;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3000);
