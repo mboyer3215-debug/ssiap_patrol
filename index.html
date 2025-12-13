@@ -285,6 +285,8 @@ try {
         console.log('Firebase initialisé avec succès');
         updateFirebaseStatus(true);
         chargerDepuisFirebase();
+        // Activer la synchronisation en temps réel
+        activerSyncTempsReel();
     }
 } catch (e) {
     console.log('Firebase non disponible:', e);
@@ -329,8 +331,11 @@ function sauvegarderVersFirebase() {
     }
 }
 
-function chargerDepuisFirebase() {
-    if (!firestoreEnabled || !db) return;
+function chargerDepuisFirebase(callback) {
+    if (!firestoreEnabled || !db) {
+        if (callback) callback();
+        return;
+    }
 
     try {
         db.collection('ssiap-patrol').doc('data').get()
@@ -345,13 +350,62 @@ function chargerDepuisFirebase() {
                     DB.mainCourante = data.mainCourante || [];
                     DB.consignes = data.consignes || DB.consignes;
                     console.log('Données chargées depuis Firebase');
-                    initLogin();
+                    if (callback) callback();
+                    else initLogin();
                 }
             })
-            .catch(err => console.error('Erreur chargement Firebase:', err));
+            .catch(err => {
+                console.error('Erreur chargement Firebase:', err);
+                if (callback) callback();
+            });
     } catch (e) {
         console.error('Erreur lors du chargement Firebase:', e);
+        if (callback) callback();
     }
+}
+
+// Activer l'écoute en temps réel Firebase
+function activerSyncTempsReel() {
+    if (!firestoreEnabled || !db) return;
+
+    try {
+        db.collection('ssiap-patrol').doc('data').onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                DB.agents = data.agents || DB.agents;
+                DB.materiels = data.materiels || DB.materiels;
+                DB.prisesPoste = data.prisesPoste || [];
+                DB.rondes = data.rondes || [];
+                DB.evenements = data.evenements || [];
+                DB.mainCourante = data.mainCourante || [];
+                DB.consignes = data.consignes || DB.consignes;
+                console.log('🔄 Données synchronisées en temps réel');
+
+                // Rafraîchir la vue actuelle si l'app est ouverte
+                if (currentUser && currentView) {
+                    const c = document.getElementById('mainContent');
+                    if (c && views[currentView]) {
+                        c.innerHTML = '<div class="fade-in">' + views[currentView]() + '</div>';
+                    }
+                }
+            }
+        }, err => {
+            console.error('Erreur sync temps réel:', err);
+        });
+    } catch (e) {
+        console.error('Erreur activation sync temps réel:', e);
+    }
+}
+
+// Rafraîchir manuellement les données
+function rafraichirDonnees() {
+    showToast('🔄 Synchronisation...', 'info');
+    chargerDepuisFirebase(() => {
+        showToast('✅ Données synchronisées !');
+        if (currentView) {
+            navigate(currentView);
+        }
+    });
 }
 
 // ========== DARK MODE ==========
@@ -1359,6 +1413,7 @@ function renderRondes() {
                 <p class="text-gray-500 text-sm mt-1">${stats.total} ronde(s) • ${stats.enCours} en cours</p>
             </div>
             <div class="flex gap-2">
+                <button onclick="rafraichirDonnees()" class="btn btn-secondary btn-sm" title="Rafraîchir les données"><i class="fas fa-sync-alt"></i></button>
                 ${canCreate ? '<button onclick="showModalRonde()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>' : ''}
             </div>
         </div>
