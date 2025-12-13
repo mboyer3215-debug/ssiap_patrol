@@ -1511,6 +1511,34 @@ function reinitialiserFiltresRondes() {
 
 function showModalRonde() {
     const agentsPoste = getAgentsEnPoste();
+
+    // Si SSIAP 1, vérifier qu'il est bien en poste
+    if (currentUser?.qualification === 'SSIAP 1') {
+        const estEnPoste = agentsPoste.find(a => a.id === currentUser.id);
+
+        if (!estEnPoste) {
+            // Afficher un message demandant de faire la prise de poste au PC Sécurité
+            showModal('⚠️ Prise de poste requise', `
+                <div class="text-center space-y-4">
+                    <div class="w-20 h-20 bg-yellow-100 dark:bg-yellow-900/50 rounded-full flex items-center justify-center mx-auto">
+                        <i class="fas fa-desktop text-yellow-600 text-3xl"></i>
+                    </div>
+                    <div class="text-lg font-semibold text-gray-800 dark:text-white">
+                        Vous n'êtes pas en poste
+                    </div>
+                    <div class="text-gray-600 dark:text-gray-400">
+                        Vous devez d'abord effectuer votre <strong>prise de poste</strong> au <strong>PC Sécurité</strong> avant de pouvoir démarrer une ronde.
+                    </div>
+                    <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg text-sm text-blue-700 dark:text-blue-400">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Rendez-vous au poste de sécurité pour que le chef de poste enregistre votre prise de poste.
+                    </div>
+                </div>
+            `, null, 'Compris');
+            return;
+        }
+    }
+
     if (!agentsPoste.length) {
         showToast('Aucun agent en poste pour effectuer une ronde', 'error');
         return;
@@ -1528,7 +1556,7 @@ function showModalRonde() {
                 <div>
                     <label class="block text-sm font-semibold mb-2"><i class="fas fa-user mr-1 text-primary-500"></i>Agent *</label>
                     <select id="rondeAgent" class="input">
-                        ${agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom} (${a.qualification})</option>`).join('')}
+                        ${agentsPoste.map(a => `<option value="${a.id}" ${a.id === currentUser?.id ? 'selected' : ''}>${a.prenom} ${a.nom} (${a.qualification})</option>`).join('')}
                     </select>
                 </div>
             </div>
