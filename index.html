@@ -1299,82 +1299,271 @@ function finPoste(id) {
 }
 
 // ========== RONDES ==========
-const typesRondes = ['Ouverture', 'Fermeture', 'Vérification moyens de secours', 'Vérification dégagements', 'Surveillance travaux', 'Surveillance post incident'];
+const typesRondes = ['Ouverture', 'Fermeture', 'Vérification moyens de secours', 'Vérification dégagements', 'Surveillance travaux', 'Surveillance post incident', 'Ronde de sécurité', 'Ronde technique', 'Ronde incendie'];
+
+const zonesRondes = ['Bâtiment Principal', 'Parking', 'Sous-sol', 'RDC', '1er étage', '2ème étage', '3ème étage', 'Toiture/Terrasse', 'Extérieurs', 'Zone technique', 'Local SSI', 'Toutes zones'];
+
+const pointsControleParZone = {
+    'Bâtiment Principal': ['Entrée principale', 'Accueil', 'Hall', 'Escalier A', 'Escalier B', 'Ascenseurs', 'Issues de secours'],
+    'Parking': ['Entrée véhicules', 'Sortie véhicules', 'Niveau -1', 'Niveau -2', 'Local technique parking', 'Désenfumage parking'],
+    'Sous-sol': ['Local technique', 'Chaufferie', 'Local électrique', 'TGBT', 'Réserve', 'Archives'],
+    'RDC': ['Hall entrée', 'Accueil', 'Bureaux RDC', 'Sanitaires', 'Local poubelles', 'Issue secours RDC'],
+    '1er étage': ['Couloir 1er', 'Bureaux 100-110', 'Salle réunion 1', 'Sanitaires 1er', 'Issue secours 1er'],
+    '2ème étage': ['Couloir 2ème', 'Bureaux 200-210', 'Salle réunion 2', 'Sanitaires 2ème', 'Issue secours 2ème'],
+    '3ème étage': ['Couloir 3ème', 'Bureaux 300-310', 'Direction', 'Sanitaires 3ème', 'Issue secours 3ème'],
+    'Toiture/Terrasse': ['Accès toiture', 'Machinerie ascenseur', 'CTA', 'Antennes', 'Garde-corps'],
+    'Extérieurs': ['Façade Nord', 'Façade Sud', 'Façade Est', 'Façade Ouest', 'Espaces verts', 'Clôtures'],
+    'Zone technique': ['Local SSI', 'PC Sécurité', 'Local sprinkler', 'Groupe électrogène', 'Local onduleur'],
+    'Local SSI': ['Centrale incendie', 'Tableau report', 'BAES', 'Téléphone sécurité', 'Clés de sécurité'],
+    'Toutes zones': ['Vérification générale']
+};
+
+const duréesEstimées = ['15 min', '30 min', '45 min', '1h', '1h30', '2h'];
+
+// Variables de filtres pour les rondes
+let filtreRondeStatut = '';
+let filtreRondeZone = '';
+let filtreRondeType = '';
 
 function renderRondes() {
-    const isSsiap2 = currentUser?.qualification === 'SSIAP 2';
-    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
-    const isReadOnly = isSsiap2 || isSsiap3;
+    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
+    const canCreate = isSsiap1; // Seul SSIAP 1 peut créer des rondes
+
+    const stats = {
+        total: DB.rondes.length,
+        enCours: DB.rondes.filter(r => !r.heureFin).length,
+        terminees: DB.rondes.filter(r => r.heureFin).length,
+        anomalies: DB.rondes.filter(r => r.anomalies?.length).length
+    };
+
+    // Filtrer les rondes
+    const rondesFiltrees = DB.rondes.filter(r => {
+        const matchStatut = !filtreRondeStatut ||
+            (filtreRondeStatut === 'En cours' && !r.heureFin) ||
+            (filtreRondeStatut === 'Terminée' && r.heureFin);
+        const matchZone = !filtreRondeZone || r.zone === filtreRondeZone;
+        const matchType = !filtreRondeType || r.type === filtreRondeType;
+        return matchStatut && matchZone && matchType;
+    });
+
+    // Rondes en cours de l'utilisateur actuel
+    const mesRondesEnCours = DB.rondes.filter(r => !r.heureFin && r.agentId === currentUser?.id);
+
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-route mr-2 text-primary-500"></i>Rondes</h1>
-            ${isReadOnly ? '' : '<button onclick="showModalRonde()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>'}
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <i class="fas fa-route text-primary-500"></i>
+                    Gestion des Rondes
+                </h1>
+                <p class="text-gray-500 text-sm mt-1">${stats.total} ronde(s) • ${stats.enCours} en cours</p>
+            </div>
+            <div class="flex gap-2">
+                ${canCreate ? '<button onclick="showModalRonde()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>' : ''}
+            </div>
         </div>
 
+        ${mesRondesEnCours.length ? `
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-xl p-4 mb-6">
+            <div class="font-bold text-yellow-700 dark:text-yellow-400 mb-2"><i class="fas fa-walking mr-2"></i>Mes rondes en cours</div>
+            <div class="space-y-2">
+                ${mesRondesEnCours.map(r => `
+                    <div class="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-lg">
+                        <div>
+                            <div class="font-medium">${r.nom || r.type}</div>
+                            <div class="text-sm text-gray-500">Départ: ${formatTime(r.heureDebut)} • ${r.pointsControle?.filter(p => p.valide).length || 0}/${r.pointsControle?.length || 0} points validés</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="effectuerRonde(${r.id})" class="btn btn-warning btn-sm"><i class="fas fa-clipboard-check"></i> Continuer</button>
+                            <button onclick="terminerRondeAvecDetails(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-flag-checkered"></i> Terminer</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        <!-- Statistiques avec points colorés -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card bg-white dark:bg-slate-800">
-                <div class="value text-gray-800 dark:text-white">${DB.rondes.length}</div>
-                <div class="label">Total</div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Total</div>
+                    <div class="text-2xl font-bold text-gray-800 dark:text-white">${stats.total}</div>
+                </div>
             </div>
-            <div class="stat-card bg-white dark:bg-slate-800">
-                <div class="value text-green-600">${DB.rondes.filter(r => !r.heureFin).length}</div>
-                <div class="label">En cours</div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-orange-500 animate-pulse"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">En cours</div>
+                    <div class="text-2xl font-bold text-orange-600">${stats.enCours}</div>
+                </div>
             </div>
-            <div class="stat-card bg-white dark:bg-slate-800">
-                <div class="value text-blue-600">${DB.rondes.filter(r => r.heureFin).length}</div>
-                <div class="label">Terminées</div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-green-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Terminées</div>
+                    <div class="text-2xl font-bold text-green-600">${stats.terminees}</div>
+                </div>
             </div>
-            <div class="stat-card bg-white dark:bg-slate-800">
-                <div class="value text-orange-600">${DB.rondes.filter(r => r.anomalies?.length).length}</div>
-                <div class="label">Avec anomalies</div>
+            <div class="stat-card bg-white dark:bg-slate-800 flex items-center gap-4">
+                <div class="w-4 h-4 rounded-full bg-red-500"></div>
+                <div>
+                    <div class="text-xs text-gray-500 uppercase">Avec anomalies</div>
+                    <div class="text-2xl font-bold text-red-600">${stats.anomalies}</div>
+                </div>
             </div>
         </div>
 
+        <!-- Filtres -->
+        <div class="card mb-6">
+            <div class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-filter mr-1"></i>Statut</label>
+                        <select id="filtreRondeStatut" class="input" onchange="filtrerRondes()">
+                            <option value="">Tous les statuts</option>
+                            <option value="En cours" ${filtreRondeStatut === 'En cours' ? 'selected' : ''}>En cours</option>
+                            <option value="Terminée" ${filtreRondeStatut === 'Terminée' ? 'selected' : ''}>Terminée</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt mr-1"></i>Zone</label>
+                        <select id="filtreRondeZone" class="input" onchange="filtrerRondes()">
+                            <option value="">Toutes les zones</option>
+                            ${zonesRondes.map(z => `<option value="${z}" ${filtreRondeZone === z ? 'selected' : ''}>${z}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1"><i class="fas fa-route mr-1"></i>Type</label>
+                        <select id="filtreRondeType" class="input" onchange="filtrerRondes()">
+                            <option value="">Tous les types</option>
+                            ${typesRondes.map(t => `<option value="${t}" ${filtreRondeType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="reinitialiserFiltresRondes()" class="btn btn-secondary w-full"><i class="fas fa-undo mr-1"></i>Réinitialiser</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des rondes -->
         <div class="card">
             <div class="p-4 space-y-3">
-                ${DB.rondes.length ? DB.rondes.map(r => {
+                ${rondesFiltrees.length ? rondesFiltrees.map(r => {
                     const agent = DB.agents.find(a => a.id === r.agentId);
+                    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+                    const totalPoints = r.pointsControle?.length || 0;
+                    const progression = totalPoints > 0 ? Math.round((pointsValides / totalPoints) * 100) : 0;
+                    const hasAnomalies = r.anomalies?.length > 0;
+
                     return `
-                        <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
-                            <div>
-                                <div class="flex items-center gap-2 mb-1">
+                        <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl ${hasAnomalies ? 'border-l-4 border-red-500' : ''}">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
                                     <span class="badge ${r.heureFin ? 'badge-success' : 'badge-warning'}">${r.heureFin ? 'Terminée' : 'En cours'}</span>
                                     <span class="badge badge-info">${r.type}</span>
+                                    ${r.zone ? `<span class="badge badge-purple">${r.zone}</span>` : ''}
+                                    ${hasAnomalies ? `<span class="badge badge-danger">${r.anomalies.length} anomalie(s)</span>` : ''}
                                 </div>
                                 <div class="font-medium text-gray-800 dark:text-white">${r.nom || r.type}</div>
-                                <div class="text-sm text-gray-500">${agent?.prenom} ${agent?.nom} • ${formatDateTime(r.heureDebut)}</div>
+                                <div class="text-sm text-gray-500">${agent?.prenom || ''} ${agent?.nom || ''} • ${formatDateTime(r.heureDebut)}</div>
+                                ${totalPoints > 0 ? `
+                                <div class="mt-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 bg-gray-200 dark:bg-slate-600 rounded-full h-2">
+                                            <div class="bg-green-500 h-2 rounded-full transition-all" style="width: ${progression}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">${pointsValides}/${totalPoints}</span>
+                                    </div>
+                                </div>
+                                ` : ''}
                             </div>
-                            <div class="flex gap-2">
-                                ${!r.heureFin && !isReadOnly ? `<button onclick="finRonde(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Terminer</button>` : ''}
+                            <div class="flex gap-2 flex-wrap">
+                                ${!r.heureFin && r.agentId === currentUser?.id ? `
+                                    <button onclick="effectuerRonde(${r.id})" class="btn btn-warning btn-sm"><i class="fas fa-clipboard-check"></i> Valider</button>
+                                    <button onclick="terminerRondeAvecDetails(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-flag-checkered"></i></button>
+                                ` : ''}
                                 <button onclick="voirRonde(${r.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
                     `;
-                }).join('') : '<p class="text-gray-500 text-center py-8">Aucune ronde</p>'}
+                }).join('') : '<p class="text-gray-500 text-center py-8">Aucune ronde trouvée</p>'}
             </div>
         </div>
     `;
 }
 
+function filtrerRondes() {
+    filtreRondeStatut = document.getElementById('filtreRondeStatut')?.value || '';
+    filtreRondeZone = document.getElementById('filtreRondeZone')?.value || '';
+    filtreRondeType = document.getElementById('filtreRondeType')?.value || '';
+    navigate('rondes');
+}
+
+function reinitialiserFiltresRondes() {
+    filtreRondeStatut = '';
+    filtreRondeZone = '';
+    filtreRondeType = '';
+    navigate('rondes');
+}
+
 function showModalRonde() {
     const agentsPoste = getAgentsEnPoste();
+    if (!agentsPoste.length) {
+        showToast('Aucun agent en poste pour effectuer une ronde', 'error');
+        return;
+    }
+
     showModal('Nouvelle Ronde', `
         <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-semibold mb-2">Type de ronde</label>
-                <select id="rondeType" class="input">
-                    ${typesRondes.map(t => `<option value="${t}">${t}</option>`).join('')}
-                </select>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-route mr-1 text-primary-500"></i>Type de ronde *</label>
+                    <select id="rondeType" class="input">
+                        ${typesRondes.map(t => `<option value="${t}">${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-user mr-1 text-primary-500"></i>Agent *</label>
+                    <select id="rondeAgent" class="input">
+                        ${agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom} (${a.qualification})</option>`).join('')}
+                    </select>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-semibold mb-2">Agent</label>
-                <select id="rondeAgent" class="input">
-                    ${agentsPoste.length ? agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('') : '<option value="">Aucun agent en poste</option>'}
-                </select>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-map-marker-alt mr-1 text-primary-500"></i>Zone / Secteur *</label>
+                    <select id="rondeZone" class="input" onchange="updatePointsControle()">
+                        ${zonesRondes.map(z => `<option value="${z}">${z}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-clock mr-1 text-primary-500"></i>Durée estimée</label>
+                    <select id="rondeDuree" class="input">
+                        ${duréesEstimées.map(d => `<option value="${d}">${d}</option>`).join('')}
+                    </select>
+                </div>
             </div>
+
             <div>
-                <label class="block text-sm font-semibold mb-2">Observation</label>
-                <textarea id="rondeObs" class="input" rows="2"></textarea>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-tasks mr-1 text-primary-500"></i>Points de contrôle</label>
+                <div id="pointsControleContainer" class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg max-h-40 overflow-y-auto">
+                    <!-- Points de contrôle dynamiques -->
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Les points cochés seront à valider pendant la ronde</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-edit mr-1 text-primary-500"></i>Consignes / Instructions</label>
+                <textarea id="rondeConsignes" class="input" rows="2" placeholder="Instructions spécifiques pour cette ronde..."></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-comment mr-1 text-primary-500"></i>Observation de départ</label>
+                <textarea id="rondeObs" class="input" rows="2" placeholder="Observations avant le départ..."></textarea>
             </div>
         </div>
     `, () => {
@@ -1382,15 +1571,59 @@ function showModalRonde() {
         if (!agentId) return showToast('Sélectionnez un agent', 'error');
 
         const type = document.getElementById('rondeType').value;
-        const ronde = { id: genId(), type, nom: type, agentId, heureDebut: new Date().toISOString(), heureFin: null, observation: document.getElementById('rondeObs').value };
+        const zone = document.getElementById('rondeZone').value;
+        const duree = document.getElementById('rondeDuree').value;
+        const consignes = document.getElementById('rondeConsignes').value;
+        const observation = document.getElementById('rondeObs').value;
+
+        // Récupérer les points de contrôle cochés
+        const pointsChecked = [];
+        document.querySelectorAll('#pointsControleContainer input[type="checkbox"]:checked').forEach(cb => {
+            pointsChecked.push({ nom: cb.value, valide: false, heureValidation: null, observation: '' });
+        });
+
+        const ronde = {
+            id: genId(),
+            type,
+            nom: `${type} - ${zone}`,
+            agentId,
+            zone,
+            dureeEstimee: duree,
+            consignes,
+            pointsControle: pointsChecked,
+            heureDebut: new Date().toISOString(),
+            heureFin: null,
+            observation,
+            observationFin: '',
+            anomalies: [],
+            statut: 'En cours'
+        };
         DB.rondes.unshift(ronde);
 
         const agent = DB.agents.find(a => a.id === agentId);
-        addMainCourante('Départ Ronde', `${type} - ${agent.prenom} ${agent.nom}`, agentId);
+        addMainCourante('Départ Ronde', `${type} - ${zone} - ${agent.prenom} ${agent.nom} (${pointsChecked.length} points)`, agentId);
+        sauvegarderVersFirebase();
         closeModal();
-        showToast('Ronde créée');
+        showToast('🚶 Ronde démarrée !');
         navigate('rondes');
     });
+
+    // Initialiser les points de contrôle
+    setTimeout(() => updatePointsControle(), 100);
+}
+
+function updatePointsControle() {
+    const zone = document.getElementById('rondeZone')?.value;
+    const container = document.getElementById('pointsControleContainer');
+    if (!zone || !container) return;
+
+    const points = pointsControleParZone[zone] || [];
+    container.innerHTML = points.length ? points.map((p, i) => `
+        <label class="flex items-center gap-2 p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded cursor-pointer">
+            <input type="checkbox" value="${p}" checked class="w-4 h-4">
+            <span class="text-sm">${p}</span>
+        </label>
+    `).join('') : '<p class="text-gray-500 text-sm">Aucun point de contrôle défini pour cette zone</p>';
 }
 
 function finRonde(id) {
@@ -1398,24 +1631,268 @@ function finRonde(id) {
         const r = DB.rondes.find(x => x.id === id);
         if (r) {
             r.heureFin = new Date().toISOString();
+            r.statut = 'Terminée';
             const agent = DB.agents.find(a => a.id === r.agentId);
-            addMainCourante('Fin Ronde', `${r.type} - ${agent.prenom} ${agent.nom}`, r.agentId);
-            showToast('Ronde terminée');
+            const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+            const totalPoints = r.pointsControle?.length || 0;
+            addMainCourante('Fin Ronde', `${r.type} - ${r.zone || ''} - ${agent.prenom} ${agent.nom} (${pointsValides}/${totalPoints} points)`, r.agentId);
+            sauvegarderVersFirebase();
+            showToast('✅ Ronde terminée');
             navigate('rondes');
         }
     });
 }
 
+// Effectuer la ronde - Valider les points de contrôle
+function effectuerRonde(id) {
+    const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+
+    const agent = DB.agents.find(a => a.id === r.agentId);
+    const pointsControle = r.pointsControle || [];
+
+    showModal(`Ronde en cours - ${r.zone || r.type}`, `
+        <div class="space-y-4">
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                <div class="text-sm text-blue-700 dark:text-blue-400">
+                    <strong>${r.type}</strong> • ${agent?.prenom} ${agent?.nom} • Départ: ${formatTime(r.heureDebut)}
+                </div>
+                ${r.consignes ? `<div class="mt-2 text-sm"><strong>Consignes:</strong> ${r.consignes}</div>` : ''}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-tasks mr-1"></i>Points de contrôle (${pointsControle.filter(p => p.valide).length}/${pointsControle.length})</label>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                    ${pointsControle.map((p, i) => `
+                        <div class="flex items-center gap-3 p-3 ${p.valide ? 'bg-green-50 dark:bg-green-900/30' : 'bg-gray-50 dark:bg-slate-700'} rounded-lg">
+                            <input type="checkbox" id="pc_${i}" ${p.valide ? 'checked' : ''} class="w-5 h-5" onchange="validerPointControle(${id}, ${i}, this.checked)">
+                            <div class="flex-1">
+                                <label for="pc_${i}" class="font-medium cursor-pointer ${p.valide ? 'text-green-700 dark:text-green-400' : ''}">${p.nom}</label>
+                                ${p.heureValidation ? `<div class="text-xs text-gray-500">Validé à ${formatTime(p.heureValidation)}</div>` : ''}
+                            </div>
+                            <button onclick="ajouterObservationPoint(${id}, ${i})" class="btn btn-icon btn-sm btn-secondary" title="Observation">
+                                <i class="fas fa-comment ${p.observation ? 'text-blue-500' : ''}"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-exclamation-triangle mr-1 text-red-500"></i>Signaler une anomalie</label>
+                <div class="flex gap-2">
+                    <input type="text" id="nouvelleAnomalie" class="input flex-1" placeholder="Description de l'anomalie...">
+                    <button onclick="ajouterAnomalie(${id})" class="btn btn-danger"><i class="fas fa-plus"></i></button>
+                </div>
+                ${r.anomalies?.length ? `
+                <div class="mt-2 space-y-1">
+                    ${r.anomalies.map((a, i) => `
+                        <div class="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/30 rounded text-sm text-red-700 dark:text-red-400">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span class="flex-1">${a.description}</span>
+                            <span class="text-xs">${formatTime(a.date)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : ''}
+            </div>
+        </div>
+    `, () => {
+        closeModal();
+        navigate('rondes');
+    }, 'Fermer');
+}
+
+function validerPointControle(rondeId, pointIndex, valide) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (r && r.pointsControle[pointIndex]) {
+        r.pointsControle[pointIndex].valide = valide;
+        r.pointsControle[pointIndex].heureValidation = valide ? new Date().toISOString() : null;
+        sauvegarderVersFirebase();
+
+        // Rafraîchir le modal
+        effectuerRonde(rondeId);
+    }
+}
+
+function ajouterObservationPoint(rondeId, pointIndex) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle[pointIndex];
+    const obsActuelle = point.observation || '';
+
+    showModal(`Observation - ${point.nom}`, `
+        <div class="space-y-4">
+            <textarea id="obsPoint" class="input" rows="4" placeholder="Observation pour ce point de contrôle...">${obsActuelle}</textarea>
+        </div>
+    `, () => {
+        r.pointsControle[pointIndex].observation = document.getElementById('obsPoint').value;
+        sauvegarderVersFirebase();
+        closeModal();
+        effectuerRonde(rondeId);
+    });
+}
+
+function ajouterAnomalie(rondeId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const description = document.getElementById('nouvelleAnomalie')?.value;
+    if (!description) return showToast('Décrivez l\'anomalie', 'error');
+
+    if (!r.anomalies) r.anomalies = [];
+    r.anomalies.push({
+        id: genId(),
+        description,
+        date: new Date().toISOString(),
+        agentId: currentUser?.id
+    });
+
+    const agent = DB.agents.find(a => a.id === currentUser?.id);
+    addMainCourante('Anomalie Ronde', `${r.type} - ${r.zone || ''}: ${description}`, currentUser?.id);
+    sauvegarderVersFirebase();
+    showToast('⚠️ Anomalie signalée');
+    effectuerRonde(rondeId);
+}
+
+function terminerRondeAvecDetails(id) {
+    const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+
+    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+    const totalPoints = r.pointsControle?.length || 0;
+    const tousValides = pointsValides === totalPoints;
+
+    showModal('Terminer la ronde', `
+        <div class="space-y-4">
+            <div class="bg-${tousValides ? 'green' : 'orange'}-50 dark:bg-${tousValides ? 'green' : 'orange'}-900/30 p-4 rounded-lg">
+                <div class="font-bold text-${tousValides ? 'green' : 'orange'}-700 dark:text-${tousValides ? 'green' : 'orange'}-400">
+                    ${tousValides ? '✅ Tous les points validés' : `⚠️ ${totalPoints - pointsValides} point(s) non validé(s)`}
+                </div>
+                <div class="text-sm mt-1">${pointsValides}/${totalPoints} points de contrôle</div>
+            </div>
+
+            ${r.anomalies?.length ? `
+            <div class="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
+                <div class="font-bold text-red-700 dark:text-red-400 mb-2">⚠️ ${r.anomalies.length} anomalie(s) signalée(s)</div>
+                <ul class="text-sm space-y-1">
+                    ${r.anomalies.map(a => `<li>• ${a.description}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Observation de fin de ronde</label>
+                <textarea id="obsFin" class="input" rows="3" placeholder="Observations finales, remarques...">${r.observationFin || ''}</textarea>
+            </div>
+        </div>
+    `, () => {
+        r.heureFin = new Date().toISOString();
+        r.statut = 'Terminée';
+        r.observationFin = document.getElementById('obsFin').value;
+
+        const agent = DB.agents.find(a => a.id === r.agentId);
+        const duree = Math.round((new Date(r.heureFin) - new Date(r.heureDebut)) / 60000);
+        addMainCourante('Fin Ronde', `${r.type} - ${r.zone || ''} - ${agent.prenom} ${agent.nom} (${pointsValides}/${totalPoints} pts, ${duree} min${r.anomalies?.length ? `, ${r.anomalies.length} anomalie(s)` : ''})`, r.agentId);
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Ronde terminée');
+        navigate('rondes');
+    });
+}
+
 function voirRonde(id) {
     const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+
     const agent = DB.agents.find(a => a.id === r.agentId);
-    showModal('Détails Ronde', `
-        <div class="space-y-3">
-            <div><strong>Type:</strong> ${r.type}</div>
-            <div><strong>Agent:</strong> ${agent?.prenom} ${agent?.nom}</div>
-            <div><strong>Début:</strong> ${formatDateTime(r.heureDebut)}</div>
-            <div><strong>Fin:</strong> ${r.heureFin ? formatDateTime(r.heureFin) : 'En cours'}</div>
-            <div><strong>Observation:</strong> ${r.observation || 'Aucune'}</div>
+    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+    const totalPoints = r.pointsControle?.length || 0;
+    const duree = r.heureFin ? Math.round((new Date(r.heureFin) - new Date(r.heureDebut)) / 60000) : null;
+
+    showModal('Détails de la Ronde', `
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white">${r.nom || r.type}</h3>
+                <span class="badge ${r.heureFin ? 'badge-success' : 'badge-warning'}">${r.heureFin ? 'Terminée' : 'En cours'}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Type</div>
+                    <div class="font-medium">${r.type}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Zone</div>
+                    <div class="font-medium">${r.zone || '-'}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Agent</div>
+                    <div class="font-medium">${agent?.prenom || ''} ${agent?.nom || ''}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Durée</div>
+                    <div class="font-medium">${duree ? duree + ' min' : 'En cours'}</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Début</div>
+                    <div class="font-medium">${formatDateTime(r.heureDebut)}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Fin</div>
+                    <div class="font-medium">${r.heureFin ? formatDateTime(r.heureFin) : '-'}</div>
+                </div>
+            </div>
+
+            ${totalPoints > 0 ? `
+            <div>
+                <div class="text-sm font-semibold mb-2">Points de contrôle (${pointsValides}/${totalPoints})</div>
+                <div class="space-y-1 max-h-40 overflow-y-auto">
+                    ${r.pointsControle.map(p => `
+                        <div class="flex items-center gap-2 p-2 ${p.valide ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'} rounded">
+                            <i class="fas ${p.valide ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500'}"></i>
+                            <span class="flex-1 text-sm">${p.nom}</span>
+                            ${p.heureValidation ? `<span class="text-xs text-gray-500">${formatTime(p.heureValidation)}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+
+            ${r.anomalies?.length ? `
+            <div class="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
+                <div class="font-bold text-red-700 dark:text-red-400 mb-2">⚠️ Anomalies signalées (${r.anomalies.length})</div>
+                <ul class="text-sm space-y-1">
+                    ${r.anomalies.map(a => `<li>• ${a.description} <span class="text-xs text-gray-500">(${formatTime(a.date)})</span></li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            ${r.observation ? `
+            <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                <div class="text-xs text-gray-500 uppercase mb-1">Observation départ</div>
+                <div class="text-sm">${r.observation}</div>
+            </div>
+            ` : ''}
+
+            ${r.observationFin ? `
+            <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                <div class="text-xs text-gray-500 uppercase mb-1">Observation fin</div>
+                <div class="text-sm">${r.observationFin}</div>
+            </div>
+            ` : ''}
+
+            ${r.consignes ? `
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                <div class="text-xs text-blue-500 uppercase mb-1">Consignes</div>
+                <div class="text-sm">${r.consignes}</div>
+            </div>
+            ` : ''}
         </div>
     `, null, 'Fermer');
 }
