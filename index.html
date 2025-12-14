@@ -150,7 +150,7 @@
 </head>
 <body class="bg-gray-50 dark:bg-slate-900">
 
-<!-- LOGIN -->
+<!-- LOGIN PRINCIPAL (PC Sécurité) -->
 <div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
     <div class="card p-8 w-full max-w-md fade-in">
         <div class="text-center mb-8">
@@ -184,6 +184,47 @@
             <button onclick="login()" class="btn btn-primary w-full justify-center py-3">
                 <i class="fas fa-sign-in-alt"></i> Se connecter
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- LOGIN RONDIER (Téléphone mobile) -->
+<div id="loginRondier" class="gradient-bg min-h-screen flex items-center justify-center p-4 hidden">
+    <div class="card p-6 w-full max-w-md fade-in">
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-walking text-white text-2xl"></i>
+            </div>
+            <h1 class="text-xl font-bold text-gray-800 dark:text-white">Connexion Rondier</h1>
+            <p class="text-gray-500 text-sm mt-1">Sélectionnez votre nom pour commencer</p>
+        </div>
+
+        <div id="rondierLoading" class="text-center py-8">
+            <i class="fas fa-sync-alt fa-spin text-3xl text-primary-500 mb-4"></i>
+            <p class="text-gray-500">Chargement des agents en poste...</p>
+        </div>
+
+        <div id="rondierContent" class="space-y-4 hidden">
+            <div id="rondierAgentsList" class="space-y-2">
+                <!-- Agents en poste seront listés ici -->
+            </div>
+
+            <div id="rondierNoAgent" class="text-center py-6 hidden">
+                <div class="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl"></i>
+                </div>
+                <p class="text-gray-600 dark:text-gray-400 font-medium">Aucun rondier en poste</p>
+                <p class="text-gray-500 text-sm mt-2">Faites votre prise de poste au PC Sécurité d'abord.</p>
+                <button onclick="rechargerAgentsRondier()" class="btn btn-secondary mt-4">
+                    <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+            </div>
+
+            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="afficherLoginPrincipal()" class="btn btn-secondary w-full justify-center">
+                    <i class="fas fa-desktop"></i> Connexion PC Sécurité
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -547,9 +588,16 @@ function logout() {
 
     currentUser = null;
     document.getElementById('mainApp').classList.add('hidden');
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginError').classList.add('hidden');
+
+    // Vérifier si on est en mode rondier
+    if (detecterModeRondier()) {
+        afficherLoginRondier();
+    } else {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('loginRondier').classList.add('hidden');
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginError').classList.add('hidden');
+    }
 }
 
 function telechargerBackupAuto() {
@@ -652,8 +700,11 @@ function navigate(view) {
             const qrDiv = document.getElementById('qrCodeAccess');
             if (qrDiv && typeof QRCode !== 'undefined') {
                 qrDiv.innerHTML = '';
+                // Générer l'URL avec le paramètre mode=rondier pour le mobile
+                const baseUrl = window.location.href.split('?')[0];
+                const rondierUrl = baseUrl + '?mode=rondier';
                 new QRCode(qrDiv, {
-                    text: window.location.href.split('?')[0],
+                    text: rondierUrl,
                     width: 120,
                     height: 120
                 });
@@ -697,7 +748,7 @@ function renderDashboard() {
             </div>
             <div class="bg-white p-3 rounded-xl no-print">
                 <div id="qrCodeAccess"></div>
-                <p class="text-center text-xs text-gray-600 mt-2">Scanner pour accéder</p>
+                <p class="text-center text-xs text-gray-600 mt-2"><i class="fas fa-mobile-alt mr-1"></i>Accès Rondier Mobile</p>
             </div>
         </div>
 
@@ -3357,9 +3408,137 @@ function chargerDonnees() {
     input.click();
 }
 
+// ========== LOGIN RONDIER (Mobile) ==========
+function detecterModeRondier() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('mode') === 'rondier';
+}
+
+function afficherLoginRondier() {
+    // Cacher le login principal, afficher le login rondier
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('loginRondier').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+
+    // Afficher loading
+    document.getElementById('rondierLoading').classList.remove('hidden');
+    document.getElementById('rondierContent').classList.add('hidden');
+
+    // Forcer le rechargement des données Firebase
+    chargerDepuisFirebase(() => {
+        afficherAgentsRondier();
+    });
+}
+
+function afficherAgentsRondier() {
+    // Masquer loading, afficher contenu
+    document.getElementById('rondierLoading').classList.add('hidden');
+    document.getElementById('rondierContent').classList.remove('hidden');
+
+    // Récupérer seulement les agents SSIAP 1 qui sont en poste
+    const agentsEnPoste = getAgentsEnPoste().filter(a => a.qualification === 'SSIAP 1');
+
+    const listContainer = document.getElementById('rondierAgentsList');
+    const noAgentContainer = document.getElementById('rondierNoAgent');
+
+    if (agentsEnPoste.length === 0) {
+        listContainer.innerHTML = '';
+        noAgentContainer.classList.remove('hidden');
+    } else {
+        noAgentContainer.classList.add('hidden');
+        listContainer.innerHTML = agentsEnPoste.map(a => `
+            <button onclick="loginRondier(${a.id})" class="w-full p-4 bg-gray-50 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl flex items-center gap-4 transition-all border-2 border-transparent hover:border-primary-500">
+                <div class="w-12 h-12 gradient-header rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    ${a.prenom.charAt(0)}${a.nom.charAt(0)}
+                </div>
+                <div class="flex-1 text-left">
+                    <div class="font-semibold text-gray-800 dark:text-white">${a.prenom} ${a.nom}</div>
+                    <div class="text-sm text-gray-500 flex items-center gap-2">
+                        <span class="badge badge-purple text-xs">${a.qualification}</span>
+                        <span>En poste depuis ${formatTime(a.heureDebut)}</span>
+                    </div>
+                </div>
+                <i class="fas fa-chevron-right text-gray-400"></i>
+            </button>
+        `).join('');
+    }
+}
+
+function rechargerAgentsRondier() {
+    // Réafficher loading
+    document.getElementById('rondierLoading').classList.remove('hidden');
+    document.getElementById('rondierContent').classList.add('hidden');
+
+    showToast('🔄 Actualisation...', 'info');
+
+    // Forcer le rechargement depuis Firebase
+    chargerDepuisFirebase(() => {
+        afficherAgentsRondier();
+        showToast('✅ Liste actualisée');
+    });
+}
+
+function loginRondier(agentId) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    if (!agent) {
+        showToast('Agent non trouvé', 'error');
+        return;
+    }
+
+    // Vérifier que l'agent est bien en poste
+    const prisePoste = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (!prisePoste) {
+        showToast('Cet agent n\'est plus en poste', 'error');
+        rechargerAgentsRondier();
+        return;
+    }
+
+    // Connexion directe sans mot de passe pour les rondiers
+    currentUser = { ...agent };
+
+    document.getElementById('loginRondier').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
+
+    initApp();
+    showToast(`Bienvenue ${currentUser.prenom} !`);
+}
+
+function afficherLoginPrincipal() {
+    // Retirer le paramètre mode=rondier de l'URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mode');
+    window.history.replaceState({}, document.title, url.toString());
+
+    // Afficher le login principal
+    document.getElementById('loginRondier').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+
+    // Recharger la liste des agents
+    initLogin();
+}
+
+
 // ========== INIT ==========
 verifierRecyclages();
-initLogin();
+
+// Vérifier le mode au chargement
+if (detecterModeRondier()) {
+    // Mode rondier: attendre le chargement Firebase puis afficher login rondier
+    if (firestoreEnabled) {
+        // Firebase s'est déjà initialisé, attendre un peu puis afficher
+        setTimeout(() => {
+            afficherLoginRondier();
+        }, 500);
+    } else {
+        // Pas de Firebase, afficher directement
+        afficherLoginRondier();
+    }
+} else {
+    // Mode normal (PC)
+    initLogin();
+}
 </script>
 </body>
 </html>
