@@ -108,7 +108,23 @@
 <div id="modalContainer"></div>
 
 <script>
-const DB={agents:[{id:7,nom:'Admin',prenom:'Système',qualification:'Administrateur',entreprise:'SecuriPlus',actif:true,email:'admin@securiplus.fr',codePin:'321518',dateDebutContrat:'2020-01-01'},{id:1,nom:'Martin',prenom:'Jean-Pierre',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-06-01'},{id:2,nom:'Dupont',prenom:'Alain',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2019-04-01'},{id:3,nom:'Boyer',prenom:'Michel',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2018-12-01'},{id:4,nom:'Dubois',prenom:'Marie',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2021-02-01'},{id:5,nom:'Garcia',prenom:'Pierre',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-10-01'},{id:6,nom:'Leroy',prenom:'François',qualification:'SSIAP 3',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2017-08-01'}],materiels:[{id:1,nom:'Extincteur CO2 5kg - Hall',type:'Extincteur',localisation:'Bâtiment Principal > RDC > Hall',statut:'Opérationnel',codeQR:'MAT-EXT-001'},{id:2,nom:'RIA DN25 - Couloir 2ème',type:'RIA',localisation:'Bâtiment Principal > 2ème étage',statut:'Opérationnel',codeQR:'MAT-RIA-001'},{id:3,nom:'Détecteur Optique B05',type:'Détecteur',localisation:'Bâtiment Principal > 2ème étage',statut:'À vérifier',codeQR:'MAT-DET-001'},{id:4,nom:'PCF Escalier A',type:'Porte CF',localisation:'Bâtiment Principal > RDC',statut:'Opérationnel',codeQR:'MAT-PCF-001'},{id:5,nom:'Extincteur Eau 6L - Cuisine',type:'Extincteur',localisation:'Bâtiment Annexe > 1er étage',statut:'En maintenance',codeQR:'MAT-EXT-002'}],prisesPoste:[],rondes:[],evenements:[],mainCourante:[],consignes:[{id:1,titre:'Visite commission de sécurité',niveau:'Particulière',priorite:'Haute',contenu:'Commission de sécurité prévue le 15 octobre 2025.',active:true},{id:2,titre:'Contrôle accès livraisons',niveau:'Courante',priorite:'Normale',contenu:'Vérifier systématiquement les bons de livraison.',active:true}]};
+const DB={agents:[
+    {id:3,nom:'Boyer',prenom:'Michel',qualification:'Administrateur',entreprise:'SecuriPlus',actif:true,email:'admin@securiplus.fr',codePin:'123456',dateDebutContrat:'2018-12-01'},
+    {id:1,nom:'Martin',prenom:'Jean-Pierre',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-06-01'},
+    {id:2,nom:'Dupont',prenom:'Alain',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2019-04-01'},
+    {id:4,nom:'Dubois',prenom:'Marie',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2021-02-01'},
+    {id:5,nom:'Garcia',prenom:'Pierre',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-10-01'},
+    {id:6,nom:'Leroy',prenom:'François',qualification:'SSIAP 3',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2017-08-01'}
+],materiels:[
+    {id:1,nom:'Extincteur CO2 5kg - Hall',type:'Extincteur',localisation:'Bâtiment Principal > RDC > Hall',statut:'Opérationnel',codeQR:'MAT-EXT-001'},
+    {id:2,nom:'RIA DN25 - Couloir 2ème',type:'RIA',localisation:'Bâtiment Principal > 2ème étage',statut:'Opérationnel',codeQR:'MAT-RIA-001'},
+    {id:3,nom:'Détecteur Optique B05',type:'Détecteur',localisation:'Bâtiment Principal > 2ème étage',statut:'À vérifier',codeQR:'MAT-DET-001'},
+    {id:4,nom:'PCF Escalier A',type:'Porte CF',localisation:'Bâtiment Principal > RDC',statut:'Opérationnel',codeQR:'MAT-PCF-001'},
+    {id:5,nom:'Extincteur Eau 6L - Cuisine',type:'Extincteur',localisation:'Bâtiment Annexe > 1er étage',statut:'En maintenance',codeQR:'MAT-EXT-002'}
+],prisesPoste:[],rondes:[],evenements:[],mainCourante:[],consignes:[
+    {id:1,titre:'Visite commission de sécurité',niveau:'Particulière',priorite:'Haute',contenu:'Commission de sécurité prévue le 15 octobre 2025.',active:true},
+    {id:2,titre:'Contrôle accès livraisons',niveau:'Courante',priorite:'Normale',contenu:'Vérifier systématiquement les bons de livraison.',active:true}
+]};
 
 let currentUser=null,currentView='dashboard',modalConfirmCallback=null,html5QrScanner=null,currentScanningPointId=null,currentScanningRondeId=null,selectedRondierAgentId=null;
 
@@ -143,7 +159,7 @@ function getChefDePoste(){return getAgentsEnPoste().find(a=>a.poste==='Chef de p
 function addMainCourante(type,desc,agentId){const a=DB.agents.find(x=>x.id===agentId);DB.mainCourante.unshift({id:genId(),date:new Date().toISOString(),type,description:desc,agent:a?`${a.prenom} ${a.nom}`:'Système',agentId});sauvegarderVersFirebase()}
 
 function genererCodePin(date){if(!date)return'0000';const d=new Date(date);const base=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();return((base*9301+49297)%10000).toString().padStart(4,'0')}
-function obtenirCodePin(a){return a.qualification==='Administrateur'?a.codePin||'321518':genererCodePin(a.dateDebutContrat)}
+function obtenirCodePin(a){return a.qualification==='Administrateur'?a.codePin||'123456':genererCodePin(a.dateDebutContrat)}
 
 function masquerTousLesEcrans(){document.getElementById('loginScreen').classList.add('screen-hidden');document.getElementById('loginRondier').classList.add('screen-hidden');document.getElementById('mainApp').classList.add('screen-hidden')}
 function afficherEcran(id){masquerTousLesEcrans();document.getElementById(id).classList.remove('screen-hidden')}
