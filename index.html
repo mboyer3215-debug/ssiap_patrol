@@ -325,7 +325,7 @@ try {
         firestoreEnabled = true;
         console.log('Firebase initialisé avec succès');
         updateFirebaseStatus(true);
-        chargerDepuisFirebase();
+        // Ne pas charger automatiquement ici - laisser l'init décider
         // Activer la synchronisation en temps réel
         activerSyncTempsReel();
     }
@@ -591,7 +591,7 @@ function logout() {
 
     // Vérifier si on est en mode rondier
     if (detecterModeRondier()) {
-        afficherLoginRondier();
+        afficherLoginRondier(true); // Forcer le rechargement
     } else {
         document.getElementById('loginScreen').classList.remove('hidden');
         document.getElementById('loginRondier').classList.add('hidden');
@@ -3414,20 +3414,28 @@ function detecterModeRondier() {
     return urlParams.get('mode') === 'rondier';
 }
 
-function afficherLoginRondier() {
+function afficherLoginRondier(forceReload = false) {
     // Cacher le login principal, afficher le login rondier
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('loginRondier').classList.remove('hidden');
     document.getElementById('mainApp').classList.add('hidden');
 
-    // Afficher loading
-    document.getElementById('rondierLoading').classList.remove('hidden');
-    document.getElementById('rondierContent').classList.add('hidden');
+    if (forceReload) {
+        // Afficher loading et recharger
+        document.getElementById('rondierLoading').classList.remove('hidden');
+        document.getElementById('rondierContent').classList.add('hidden');
 
-    // Forcer le rechargement des données Firebase
-    chargerDepuisFirebase(() => {
+        chargerDepuisFirebase(() => {
+            console.log('🔄 Données rechargées pour rondier');
+            console.log('📊 Prises de poste:', DB.prisesPoste.length);
+            afficherAgentsRondier();
+        });
+    } else {
+        // Données déjà chargées, afficher directement
+        document.getElementById('rondierLoading').classList.add('hidden');
+        document.getElementById('rondierContent').classList.remove('hidden');
         afficherAgentsRondier();
-    });
+    }
 }
 
 function afficherAgentsRondier() {
@@ -3435,14 +3443,38 @@ function afficherAgentsRondier() {
     document.getElementById('rondierLoading').classList.add('hidden');
     document.getElementById('rondierContent').classList.remove('hidden');
 
+    // DEBUG: Afficher les données brutes
+    console.log('=== DEBUG RONDIER ===');
+    console.log('DB.prisesPoste:', JSON.stringify(DB.prisesPoste));
+    console.log('DB.agents:', DB.agents.length);
+
+    // Toutes les prises de poste actives (sans fin de poste)
+    const prisesActives = DB.prisesPoste.filter(p => !p.finPoste);
+    console.log('Prises actives (sans finPoste):', prisesActives.length, JSON.stringify(prisesActives));
+
+    // Récupérer tous les agents en poste
+    const tousAgentsEnPoste = getAgentsEnPoste();
+    console.log('Tous agents en poste:', tousAgentsEnPoste.length);
+
     // Récupérer seulement les agents SSIAP 1 qui sont en poste
-    const agentsEnPoste = getAgentsEnPoste().filter(a => a.qualification === 'SSIAP 1');
+    const agentsEnPoste = tousAgentsEnPoste.filter(a => a.qualification === 'SSIAP 1');
+    console.log('Agents SSIAP 1 en poste:', agentsEnPoste.length);
 
     const listContainer = document.getElementById('rondierAgentsList');
     const noAgentContainer = document.getElementById('rondierNoAgent');
 
     if (agentsEnPoste.length === 0) {
-        listContainer.innerHTML = '';
+        // Afficher info de débogage dans l'UI
+        listContainer.innerHTML = `
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-4">
+                <div class="font-bold mb-1">🔍 Debug Firebase:</div>
+                <div>Prises de poste en DB: ${DB.prisesPoste.length}</div>
+                <div>Prises actives (sans fin): ${prisesActives.length}</div>
+                <div>Agents en poste total: ${tousAgentsEnPoste.length}</div>
+                <div>Agents SSIAP 1 en poste: ${agentsEnPoste.length}</div>
+                ${prisesActives.length > 0 ? `<div class="mt-1">IDs agents en poste: ${prisesActives.map(p => p.agentId).join(', ')}</div>` : ''}
+            </div>
+        `;
         noAgentContainer.classList.remove('hidden');
     } else {
         noAgentContainer.classList.add('hidden');
@@ -3465,17 +3497,10 @@ function afficherAgentsRondier() {
 }
 
 function rechargerAgentsRondier() {
-    // Réafficher loading
-    document.getElementById('rondierLoading').classList.remove('hidden');
-    document.getElementById('rondierContent').classList.add('hidden');
-
     showToast('🔄 Actualisation...', 'info');
-
     // Forcer le rechargement depuis Firebase
-    chargerDepuisFirebase(() => {
-        afficherAgentsRondier();
-        showToast('✅ Liste actualisée');
-    });
+    afficherLoginRondier(true);
+    showToast('✅ Liste actualisée');
 }
 
 function loginRondier(agentId) {
@@ -3523,21 +3548,31 @@ function afficherLoginPrincipal() {
 // ========== INIT ==========
 verifierRecyclages();
 
-// Vérifier le mode au chargement
-if (detecterModeRondier()) {
-    // Mode rondier: attendre le chargement Firebase puis afficher login rondier
-    if (firestoreEnabled) {
-        // Firebase s'est déjà initialisé, attendre un peu puis afficher
-        setTimeout(() => {
-            afficherLoginRondier();
-        }, 500);
-    } else {
-        // Pas de Firebase, afficher directement
+// Initialisation selon le mode
+function demarrerApplication() {
+    if (detecterModeRondier()) {
+        // Mode rondier (mobile via QR code)
+        console.log('🔸 Mode Rondier détecté');
         afficherLoginRondier();
+    } else {
+        // Mode normal (PC Sécurité)
+        console.log('🔸 Mode PC Sécurité');
+        initLogin();
     }
+}
+
+// Charger Firebase puis démarrer l'application
+if (firestoreEnabled) {
+    console.log('⏳ Chargement des données Firebase...');
+    chargerDepuisFirebase(() => {
+        console.log('✅ Données Firebase chargées');
+        console.log('📊 Prises de poste:', DB.prisesPoste.length);
+        console.log('📊 Agents en poste:', getAgentsEnPoste().length);
+        demarrerApplication();
+    });
 } else {
-    // Mode normal (PC)
-    initLogin();
+    // Pas de Firebase, démarrer directement
+    demarrerApplication();
 }
 </script>
 </body>
