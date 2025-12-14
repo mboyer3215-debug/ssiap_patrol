@@ -146,6 +146,14 @@
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Navigation mobile pour rondiers */
+        .mobile-nav-btn { transition: all 0.2s; }
+        .mobile-nav-btn:active { transform: scale(0.95); }
+        .mobile-nav-btn.active { color: #6366f1; }
+        .mobile-nav-btn.active i { color: #6366f1; }
+        .dark .mobile-nav-btn.active { color: #818cf8; }
+        .dark .mobile-nav-btn.active i { color: #818cf8; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-slate-900">
@@ -264,9 +272,27 @@
 
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
 
-    <main class="main-content lg:ml-[280px] min-h-screen pt-20 lg:pt-0">
+    <main class="main-content lg:ml-[280px] min-h-screen pt-20 lg:pt-0 pb-20 lg:pb-0">
         <div class="p-6" id="mainContent"></div>
     </main>
+
+    <!-- Barre de navigation mobile pour rondiers SSIAP 1 -->
+    <nav id="mobileNavBar" class="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-50 hidden">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="navigate('rondes')" id="mobileNavRondes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
+                <i class="fas fa-route text-xl mb-1"></i>
+                <span class="text-xs font-medium">Rondes</span>
+            </button>
+            <button onclick="navigate('materiels')" id="mobileNavMateriels" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
+                <i class="fas fa-fire-extinguisher text-xl mb-1"></i>
+                <span class="text-xs font-medium">Matériels</span>
+            </button>
+            <button onclick="navigate('consignes')" id="mobileNavConsignes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
+                <i class="fas fa-file-alt text-xl mb-1"></i>
+                <span class="text-xs font-medium">Consignes</span>
+            </button>
+        </div>
+    </nav>
 </div>
 
 <div id="modalContainer"></div>
@@ -662,6 +688,7 @@ const menuItems = [
 function initApp() {
     renderNav();
     renderSidebarActions();
+    updateMobileNav();
     const defaultView = currentUser?.qualification === 'SSIAP 1' ? 'rondes' : 'dashboard';
     navigate(defaultView);
 }
@@ -714,8 +741,17 @@ function renderNav() {
 function navigate(view) {
     currentView = view;
     renderNav();
+    updateMobileNav();
     const c = document.getElementById('mainContent');
     c.innerHTML = '<div class="fade-in">' + (views[view]?.() || '') + '</div>';
+
+    // Fermer la sidebar sur mobile après navigation
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        overlay?.classList.add('hidden');
+    }
 
     if (view === 'dashboard') {
         setTimeout(() => {
@@ -738,6 +774,35 @@ function navigate(view) {
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebarOverlay').classList.toggle('hidden');
+}
+
+function updateMobileNav() {
+    const mobileNav = document.getElementById('mobileNavBar');
+    if (!mobileNav) return;
+
+    // Afficher la barre de nav mobile uniquement pour SSIAP 1
+    if (currentUser?.qualification === 'SSIAP 1') {
+        mobileNav.classList.remove('hidden');
+
+        // Mettre à jour l'état actif des boutons
+        const buttons = {
+            'rondes': document.getElementById('mobileNavRondes'),
+            'materiels': document.getElementById('mobileNavMateriels'),
+            'consignes': document.getElementById('mobileNavConsignes')
+        };
+
+        Object.keys(buttons).forEach(id => {
+            if (buttons[id]) {
+                if (currentView === id) {
+                    buttons[id].classList.add('active');
+                } else {
+                    buttons[id].classList.remove('active');
+                }
+            }
+        });
+    } else {
+        mobileNav.classList.add('hidden');
+    }
 }
 
 // ========== VIEWS ==========
