@@ -350,17 +350,20 @@ function chargerDepuisFirebase(callback) {
                     DB.mainCourante = data.mainCourante || [];
                     DB.consignes = data.consignes || DB.consignes;
                     console.log('Données chargées depuis Firebase');
-                    if (callback) callback();
-                    else initLogin();
                 }
+                // Toujours appeler le callback, même si pas de données
+                if (callback) callback();
+                else initLogin();
             })
             .catch(err => {
                 console.error('Erreur chargement Firebase:', err);
                 if (callback) callback();
+                else initLogin();
             });
     } catch (e) {
         console.error('Erreur lors du chargement Firebase:', e);
         if (callback) callback();
+        else initLogin();
     }
 }
 
@@ -521,7 +524,12 @@ function login() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
-    initApp();
+
+    // Recharger les données Firebase à la connexion pour avoir les dernières infos
+    chargerDepuisFirebase(() => {
+        console.log('Données rechargées après connexion');
+        initApp();
+    });
 }
 
 function showLoginError(msg) {
