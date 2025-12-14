@@ -496,6 +496,7 @@ function getStatusColor(statut) {
 function verifierRecyclages() {
     const maintenant = new Date();
     const troixAnsEnMs = 3 * 365 * 24 * 60 * 60 * 1000;
+    let modifie = false;
 
     DB.agents.forEach(agent => {
         if (agent.dateRecyclage) {
@@ -504,11 +505,16 @@ function verifierRecyclages() {
 
             if (diff > troixAnsEnMs && agent.actif) {
                 agent.actif = false;
+                modifie = true;
                 console.log(`Agent ${agent.prenom} ${agent.nom} désactivé: recyclage expiré depuis ${formatDate(agent.dateRecyclage)}`);
             }
         }
     });
-    sauvegarderVersFirebase();
+
+    // Ne sauvegarder QUE si quelque chose a changé
+    if (modifie) {
+        sauvegarderVersFirebase();
+    }
 }
 
 function verifierDateContrat() {
@@ -3546,10 +3552,12 @@ function afficherLoginPrincipal() {
 
 
 // ========== INIT ==========
-verifierRecyclages();
 
 // Initialisation selon le mode
 function demarrerApplication() {
+    // Vérifier les recyclages APRÈS le chargement des données
+    verifierRecyclages();
+
     if (detecterModeRondier()) {
         // Mode rondier (mobile via QR code)
         console.log('🔸 Mode Rondier détecté');
