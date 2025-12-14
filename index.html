@@ -178,15 +178,20 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Mot de passe</label>
-                <input type="password" id="loginPassword" class="input" placeholder="••••••••">
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Code PIN</label>
+                <div class="relative">
+                    <input type="password" id="loginPassword" class="input pr-12" placeholder="••••••" maxlength="6" inputmode="numeric" oninput="afficherChiffreTemp(this)">
+                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <i id="eyeIcon" class="fas fa-eye text-xl"></i>
+                    </button>
+                </div>
             </div>
             <div class="bg-gray-50 dark:bg-slate-800 rounded-xl p-4 text-sm">
-                <div class="font-semibold text-gray-700 dark:text-gray-300 mb-2">🔐 Mots de passe</div>
+                <div class="font-semibold text-gray-700 dark:text-gray-300 mb-2">🔐 Code PIN</div>
                 <div class="space-y-1 text-gray-600 dark:text-gray-400">
-                    <div>SSIAP 1 → <code class="bg-gray-200 dark:bg-slate-700 px-2 py-0.5 rounded">rondier</code></div>
-                    <div>SSIAP 2 → <code class="bg-gray-200 dark:bg-slate-700 px-2 py-0.5 rounded">chefdeposte</code></div>
-                    <div>SSIAP 3 → <code class="bg-gray-200 dark:bg-slate-700 px-2 py-0.5 rounded">ssiap3</code></div>
+                    <div>Administrateur → Code PIN personnalisé (6 chiffres)</div>
+                    <div>SSIAP 1/2/3 → Code PIN généré automatiquement</div>
+                    <div class="text-xs mt-2 text-gray-500">Le code PIN SSIAP est basé sur la date de début de contrat</div>
                 </div>
             </div>
             <div id="loginError" class="text-red-500 text-sm font-medium hidden"></div>
@@ -326,12 +331,13 @@
 // ========== DATABASE ==========
 const DB = {
     agents: [
-        { id: 1, nom: 'Martin', prenom: 'Jean-Pierre', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'jp.martin@securiplus.fr', dateDiplome: '2020-05-15', dateRecyclage: '2023-05-15', dateDebutContrat: '2020-06-01', dateFinContrat: null },
-        { id: 2, nom: 'Dupont', prenom: 'Alain', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'a.dupont@securiplus.fr', dateDiplome: '2019-03-10', dateRecyclage: '2022-03-10', dateDebutContrat: '2019-04-01', dateFinContrat: null },
-        { id: 3, nom: 'Boyer', prenom: 'Michel', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'm.boyer@securiplus.fr', dateDiplome: '2018-11-20', dateRecyclage: '2021-11-20', dateDebutContrat: '2018-12-01', dateFinContrat: null },
-        { id: 4, nom: 'Dubois', prenom: 'Marie', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'm.dubois@securiplus.fr', dateDiplome: '2021-01-25', dateRecyclage: '2024-01-25', dateDebutContrat: '2021-02-01', dateFinContrat: null },
-        { id: 5, nom: 'Garcia', prenom: 'Pierre', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'p.garcia@securiplus.fr', dateDiplome: '2020-09-05', dateRecyclage: '2023-09-05', dateDebutContrat: '2020-10-01', dateFinContrat: null },
-        { id: 6, nom: 'Leroy', prenom: 'François', qualification: 'SSIAP 3', entreprise: 'SecuriPlus', actif: true, email: 'f.leroy@securiplus.fr', dateDiplome: '2017-07-12', dateRecyclage: '2023-07-12', dateDebutContrat: '2017-08-01', dateFinContrat: null }
+        { id: 7, nom: 'Admin', prenom: 'Système', qualification: 'Administrateur', entreprise: 'SecuriPlus', actif: true, email: 'admin@securiplus.fr', telephone: '0600000000', codePin: '321518', dateDebutContrat: '2020-01-01', dateFinContrat: null },
+        { id: 1, nom: 'Martin', prenom: 'Jean-Pierre', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'jp.martin@securiplus.fr', telephone: '0612345678', dateDiplome: '2020-05-15', dateRecyclage: '2023-05-15', dateDebutContrat: '2020-06-01', dateFinContrat: null, codePin: null },
+        { id: 2, nom: 'Dupont', prenom: 'Alain', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'a.dupont@securiplus.fr', telephone: '0623456789', dateDiplome: '2019-03-10', dateRecyclage: '2022-03-10', dateDebutContrat: '2019-04-01', dateFinContrat: null, codePin: null },
+        { id: 3, nom: 'Boyer', prenom: 'Michel', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'm.boyer@securiplus.fr', telephone: '0634567890', dateDiplome: '2018-11-20', dateRecyclage: '2021-11-20', dateDebutContrat: '2018-12-01', dateFinContrat: null, codePin: null },
+        { id: 4, nom: 'Dubois', prenom: 'Marie', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'm.dubois@securiplus.fr', telephone: '0645678901', dateDiplome: '2021-01-25', dateRecyclage: '2024-01-25', dateDebutContrat: '2021-02-01', dateFinContrat: null, codePin: null },
+        { id: 5, nom: 'Garcia', prenom: 'Pierre', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'p.garcia@securiplus.fr', telephone: '0656789012', dateDiplome: '2020-09-05', dateRecyclage: '2023-09-05', dateDebutContrat: '2020-10-01', dateFinContrat: null, codePin: null },
+        { id: 6, nom: 'Leroy', prenom: 'François', qualification: 'SSIAP 3', entreprise: 'SecuriPlus', actif: true, email: 'f.leroy@securiplus.fr', telephone: '0667890123', dateDiplome: '2017-07-12', dateRecyclage: '2023-07-12', dateDebutContrat: '2017-08-01', dateFinContrat: null, codePin: null }
     ],
     materiels: [
         { id: 1, nom: 'Extincteur CO2 5kg - Hall', type: 'Extincteur', localisation: 'Hall Entrée - Zone A', statut: 'Opérationnel', derniereMaint: '2025-01-15', prochaineMaint: '2026-01-15' },
@@ -622,25 +628,89 @@ function verifierDateContrat() {
 setInterval(verifierDateContrat, 60000);
 
 // ========== LOGIN ==========
+let pinTimeout = null;
+
+function togglePasswordVisibility() {
+    const input = document.getElementById('loginPassword');
+    const icon = document.getElementById('eyeIcon');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+function afficherChiffreTemp(input) {
+    // Annuler le timeout précédent
+    if (pinTimeout) clearTimeout(pinTimeout);
+
+    // Passer temporairement en mode texte pour montrer le dernier chiffre
+    const wasPassword = input.type === 'password';
+    if (wasPassword) {
+        input.type = 'text';
+
+        // Remettre en mode password après 500ms
+        pinTimeout = setTimeout(() => {
+            const icon = document.getElementById('eyeIcon');
+            // Ne masquer que si l'icône est en mode "eye" (pas déjà en mode visible)
+            if (icon && icon.classList.contains('fa-eye')) {
+                input.type = 'password';
+            }
+        }, 500);
+    }
+}
+
 function initLogin() {
     const sel = document.getElementById('loginAgent');
+    const agentsTries = [...DB.agents.filter(a => a.actif)].sort((a, b) => {
+        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
+        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
+    });
     sel.innerHTML = '<option value="">Sélectionner un agent...</option>' +
-        DB.agents.filter(a => a.actif).map(a =>
+        agentsTries.map(a =>
             `<option value="${a.id}">${a.prenom} ${a.nom} - ${a.qualification}</option>`
         ).join('');
 }
 
+// Générer un code PIN basé sur la date de début de contrat
+function genererCodePin(dateDebutContrat) {
+    if (!dateDebutContrat) return '0000';
+    // Utilise la date pour générer un PIN reproductible
+    const d = new Date(dateDebutContrat);
+    const base = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    // Génère un PIN 4 chiffres à partir du hash
+    const pin = ((base * 9301 + 49297) % 10000).toString().padStart(4, '0');
+    return pin;
+}
+
+// Obtenir le code PIN d'un agent (stocké pour admin, généré pour SSIAP)
+function obtenirCodePin(agent) {
+    if (agent.qualification === 'Administrateur') {
+        return agent.codePin || '321518'; // PIN par défaut pour admin
+    }
+    // Pour les SSIAP, générer à partir de la date de contrat
+    return genererCodePin(agent.dateDebutContrat);
+}
+
 function login() {
-    const agentId = parseInt(document.getElementById('loginAgent').value);
+    const agentIdStr = document.getElementById('loginAgent').value;
     const pwd = document.getElementById('loginPassword').value;
-    const agent = DB.agents.find(a => a.id === agentId);
 
-    if (!agent) return showLoginError('Sélectionnez un agent');
+    if (!agentIdStr) return showLoginError('Sélectionnez un agent');
 
-    const validPwd = agent.qualification === 'SSIAP 3' ? (pwd === 'ssiap3') :
-                     agent.qualification === 'SSIAP 2' ? (pwd === 'chefdeposte') : (pwd === 'rondier');
+    // Chercher l'agent par ID (compatible string et number)
+    const agent = DB.agents.find(a => String(a.id) === String(agentIdStr));
 
-    if (!validPwd) return showLoginError('Mot de passe incorrect');
+    if (!agent) return showLoginError('Agent non trouvé');
+
+    const expectedPin = obtenirCodePin(agent);
+
+    if (pwd !== expectedPin) return showLoginError('Code PIN incorrect');
 
     currentUser = { ...agent };
     document.getElementById('loginScreen').classList.add('hidden');
@@ -707,16 +777,16 @@ function telechargerBackupAuto() {
 
 // ========== NAVIGATION ==========
 const menuItems = [
-    { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap1: false, ssiap2: true, ssiap3: true },
-    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: false },
-    { id: 'verifications', icon: 'fa-clipboard-check', label: 'Vérifications', ssiap1: false, ssiap2: true, ssiap3: true },
-    { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap1: true, ssiap2: true, ssiap3: true },
-    { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap1: false, ssiap2: true, ssiap3: true },
-    { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap1: false, ssiap2: true, ssiap3: true },
-    { id: 'materiels', icon: 'fa-fire-extinguisher', label: 'Matériels', ssiap1: true, ssiap2: true, ssiap3: true },
-    { id: 'consignes', icon: 'fa-file-alt', label: 'Consignes', ssiap1: true, ssiap2: true, ssiap3: true },
-    { id: 'agents', icon: 'fa-users', label: 'Agents', ssiap1: false, ssiap2: false, ssiap3: true },
-    { id: 'administration', icon: 'fa-cogs', label: 'Administration', ssiap1: false, ssiap2: false, ssiap3: true }
+    { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: false, admin: false },
+    { id: 'verifications', icon: 'fa-clipboard-check', label: 'Vérifications', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'materiels', icon: 'fa-fire-extinguisher', label: 'Matériels', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'consignes', icon: 'fa-file-alt', label: 'Consignes', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'agents', icon: 'fa-users', label: 'Agents', ssiap1: false, ssiap2: false, ssiap3: true, admin: true },
+    { id: 'administration', icon: 'fa-cogs', label: 'Administration', ssiap1: false, ssiap2: false, ssiap3: false, admin: true }
 ];
 
 function initApp() {
@@ -737,8 +807,8 @@ function renderSidebarActions() {
 
     let html = '';
 
-    // SSIAP 3 : Boutons manuels de sauvegarde/chargement
-    if (qual === 'SSIAP 3') {
+    // Administrateur uniquement : Boutons manuels de sauvegarde/chargement
+    if (qual === 'Administrateur') {
         html += `
             <button onclick="sauvegarderVersFirebase(); sauvegarderDonnees();" class="btn btn-success w-full justify-center btn-sm" title="Sauvegarder dans Firebase + fichier">
                 <i class="fas fa-cloud-upload-alt"></i> Sauvegarder
@@ -763,6 +833,7 @@ function renderNav() {
     const qual = currentUser?.qualification;
     document.getElementById('navMenu').innerHTML = menuItems
         .filter(m => {
+            if (qual === 'Administrateur') return m.admin;
             if (qual === 'SSIAP 3') return m.ssiap3;
             if (qual === 'SSIAP 2') return m.ssiap2;
             if (qual === 'SSIAP 1') return m.ssiap1;
@@ -993,7 +1064,7 @@ function renderDashboard() {
                 <div class="p-4 space-y-3">
                     ${DB.consignes.filter(c => c.active && (c.destinataire === 'Tout le monde' ||
                         (c.destinataire === 'Chef de poste' && currentUser?.qualification !== 'SSIAP 1') ||
-                        (c.destinataire === 'Chef de service' && currentUser?.qualification === 'SSIAP 3')
+                        (c.destinataire === 'Chef de service' && (currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur'))
                     )).map(c => `
                         <div class="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl">
                             <i class="fas fa-file-alt text-purple-500"></i>
@@ -3190,12 +3261,16 @@ function effectuerRonde(id) {
                 <label class="block text-sm font-semibold mb-2"><i class="fas fa-tasks mr-1"></i>Points de contrôle (${pointsControle.filter(p => p.valide).length}/${pointsControle.length})</label>
                 <div class="space-y-2 max-h-60 overflow-y-auto">
                     ${pointsControle.map((p, i) => `
-                        <div class="flex items-center gap-3 p-3 ${p.valide ? 'bg-green-50 dark:bg-green-900/30' : 'bg-gray-50 dark:bg-slate-700'} rounded-lg">
+                        <div class="flex items-center gap-2 p-3 ${p.valide ? 'bg-green-50 dark:bg-green-900/30' : 'bg-gray-50 dark:bg-slate-700'} rounded-lg">
                             <input type="checkbox" id="pc_${i}" ${p.valide ? 'checked' : ''} class="w-5 h-5" onchange="validerPointControle(${id}, ${i}, this.checked)">
-                            <div class="flex-1">
-                                <label for="pc_${i}" class="font-medium cursor-pointer ${p.valide ? 'text-green-700 dark:text-green-400' : ''}">${p.nom}</label>
-                                ${p.heureValidation ? `<div class="text-xs text-gray-500">Validé à ${formatTime(p.heureValidation)}</div>` : ''}
+                            <div class="flex-1 cursor-pointer" onclick="${p.materielId ? `ouvrirFicheMaterielAnomalie(${p.materielId}, ${id})` : `signalerAnomaliePoint(${id}, ${i})`}">
+                                <div class="font-medium ${p.valide ? 'text-green-700 dark:text-green-400' : ''}">${p.nom}</div>
+                                <div class="text-xs text-gray-500">${p.materielId ? 'Cliquer pour modifier le statut' : p.qrCode || ''}</div>
+                                ${p.heureValidation ? `<div class="text-xs text-green-600">✓ Validé à ${formatTime(p.heureValidation)}</div>` : ''}
                             </div>
+                            <button onclick="signalerAnomaliePoint(${id}, ${i})" class="btn btn-icon btn-sm bg-orange-500 text-white" title="Signaler anomalie">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </button>
                             <button onclick="ajouterObservationPoint(${id}, ${i})" class="btn btn-icon btn-sm btn-secondary" title="Observation">
                                 <i class="fas fa-comment ${p.observation ? 'text-blue-500' : ''}"></i>
                             </button>
@@ -3211,12 +3286,21 @@ function effectuerRonde(id) {
                     <button onclick="ajouterAnomalie(${id})" class="btn btn-danger"><i class="fas fa-plus"></i></button>
                 </div>
                 ${r.anomalies?.length ? `
-                <div class="mt-2 space-y-1">
+                <div class="mt-2 space-y-2">
                     ${r.anomalies.map((a, i) => `
-                        <div class="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/30 rounded text-sm text-red-700 dark:text-red-400">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <span class="flex-1">${a.description}</span>
-                            <span class="text-xs">${formatTime(a.date)}</span>
+                        <div class="p-3 bg-${a.gravite === 'critique' ? 'red' : a.gravite === 'faible' ? 'yellow' : 'orange'}-50 dark:bg-${a.gravite === 'critique' ? 'red' : a.gravite === 'faible' ? 'yellow' : 'orange'}-900/30 rounded-lg border-l-4 border-${a.gravite === 'critique' ? 'red' : a.gravite === 'faible' ? 'yellow' : 'orange'}-500">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-${a.gravite === 'critique' ? 'radiation text-red-600' : a.gravite === 'faible' ? 'exclamation text-yellow-600' : 'exclamation-triangle text-orange-600'} mt-1"></i>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        ${a.pointNom ? `<span class="text-xs font-medium bg-gray-200 dark:bg-slate-600 px-2 py-0.5 rounded">${a.pointNom}</span>` : ''}
+                                        ${a.type ? `<span class="text-xs text-gray-500 dark:text-gray-400">${a.type}</span>` : ''}
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-800 dark:text-white mt-1">${a.description}</div>
+                                    <div class="text-xs text-gray-500 mt-1">${formatTime(a.date)}</div>
+                                    ${a.photo ? `<img src="${a.photo}" class="mt-2 rounded-lg max-h-32 cursor-pointer" onclick="afficherPhotoPleinEcran('${a.photo}')">` : ''}
+                                </div>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -3258,6 +3342,151 @@ function ajouterObservationPoint(rondeId, pointIndex) {
         closeModal();
         effectuerRonde(rondeId);
     });
+}
+
+let anomaliePointPhoto = null;
+
+function signalerAnomaliePoint(rondeId, pointIndex) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle[pointIndex];
+    anomaliePointPhoto = null;
+
+    showModal(`⚠️ Signaler Anomalie - ${point.nom}`, `
+        <div class="space-y-4">
+            <div class="bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
+                <div class="font-semibold text-orange-700 dark:text-orange-400">${point.nom}</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">${point.qrCode || 'Point de contrôle'}</div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Type d'anomalie</label>
+                <select id="typeAnomaliePoint" class="input">
+                    <option value="dysfonctionnement">Dysfonctionnement</option>
+                    <option value="degradation">Dégradation</option>
+                    <option value="obstacle">Obstacle / Accès bloqué</option>
+                    <option value="manquant">Élément manquant</option>
+                    <option value="securite">Problème de sécurité</option>
+                    <option value="autre">Autre</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description de l'anomalie *</label>
+                <textarea id="descAnomaliePoint" class="input" rows="3" placeholder="Décrivez le problème constaté..."></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">📷 Photo (optionnel)</label>
+                <div id="photoAnomaliePointContainer" class="space-y-2">
+                    <input type="file" id="photoAnomaliePointInput" accept="image/*" capture="environment"
+                           class="hidden" onchange="previewAnomaliePointPhoto(this)">
+                    <button type="button" onclick="document.getElementById('photoAnomaliePointInput').click()"
+                            class="btn btn-secondary w-full">
+                        <i class="fas fa-camera mr-2"></i>Prendre une photo
+                    </button>
+                    <div id="previewAnomaliePoint" class="hidden">
+                        <img id="imgPreviewAnomaliePoint" class="w-full max-h-48 object-contain rounded-lg border">
+                        <button type="button" onclick="supprimerPhotoAnomaliePoint()"
+                                class="btn btn-sm bg-red-500 text-white mt-2">
+                            <i class="fas fa-trash mr-1"></i>Supprimer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Niveau de gravité</label>
+                <div class="flex gap-2">
+                    <label class="flex-1 text-center">
+                        <input type="radio" name="gravitePoint" value="faible" class="hidden peer">
+                        <div class="p-2 rounded-lg border-2 cursor-pointer peer-checked:border-yellow-500 peer-checked:bg-yellow-50 dark:peer-checked:bg-yellow-900/30">
+                            <i class="fas fa-exclamation text-yellow-500"></i>
+                            <div class="text-xs">Faible</div>
+                        </div>
+                    </label>
+                    <label class="flex-1 text-center">
+                        <input type="radio" name="gravitePoint" value="moyenne" class="hidden peer" checked>
+                        <div class="p-2 rounded-lg border-2 cursor-pointer peer-checked:border-orange-500 peer-checked:bg-orange-50 dark:peer-checked:bg-orange-900/30">
+                            <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                            <div class="text-xs">Moyenne</div>
+                        </div>
+                    </label>
+                    <label class="flex-1 text-center">
+                        <input type="radio" name="gravitePoint" value="critique" class="hidden peer">
+                        <div class="p-2 rounded-lg border-2 cursor-pointer peer-checked:border-red-500 peer-checked:bg-red-50 dark:peer-checked:bg-red-900/30">
+                            <i class="fas fa-radiation text-red-500"></i>
+                            <div class="text-xs">Critique</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    `, async () => {
+        const description = document.getElementById('descAnomaliePoint').value.trim();
+        if (!description) {
+            showToast('Décrivez l\'anomalie', 'error');
+            return;
+        }
+
+        const type = document.getElementById('typeAnomaliePoint').value;
+        const gravite = document.querySelector('input[name="gravitePoint"]:checked')?.value || 'moyenne';
+
+        // Convertir la photo en base64 si présente
+        let photoBase64 = null;
+        const photoInput = document.getElementById('photoAnomaliePointInput');
+        if (photoInput.files && photoInput.files[0]) {
+            try {
+                photoBase64 = await convertirEnBase64(photoInput.files[0]);
+            } catch(e) {
+                console.error('Erreur conversion photo:', e);
+            }
+        }
+
+        if (!r.anomalies) r.anomalies = [];
+        r.anomalies.push({
+            id: genId(),
+            pointIndex: pointIndex,
+            pointNom: point.nom,
+            type: type,
+            description: description,
+            gravite: gravite,
+            photo: photoBase64,
+            date: new Date().toISOString(),
+            agentId: currentUser?.id
+        });
+
+        // Ajouter aussi dans la main courante
+        const graviteLabel = gravite === 'critique' ? '🔴 CRITIQUE' : (gravite === 'faible' ? '🟡 Faible' : '🟠 Moyenne');
+        addMainCourante('Anomalie Point Contrôle', `${graviteLabel} - ${point.nom}: ${description}`, currentUser?.id);
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast(`⚠️ Anomalie signalée sur ${point.nom}`, 'warning');
+
+        // Vibration de confirmation
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+        effectuerRonde(rondeId);
+    });
+}
+
+function previewAnomaliePointPhoto(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imgPreviewAnomaliePoint').src = e.target.result;
+            document.getElementById('previewAnomaliePoint').classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function supprimerPhotoAnomaliePoint() {
+    document.getElementById('photoAnomaliePointInput').value = '';
+    document.getElementById('previewAnomaliePoint').classList.add('hidden');
+    document.getElementById('imgPreviewAnomaliePoint').src = '';
 }
 
 function ajouterAnomalie(rondeId) {
@@ -3501,7 +3730,7 @@ const typesEvt = ['Alarme Incendie', 'Secours à personne', 'Problème technique
 function renderEvenements() {
     const evtsActifs = DB.evenements.filter(e => e.statut !== 'Terminé');
     const evtsTermines = DB.evenements.filter(e => e.statut === 'Terminé');
-    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
 
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -3545,7 +3774,7 @@ function renderEvenements() {
 function renderEvenementCard(e) {
     const agent = DB.agents.find(a => a.id === e.agentId);
     const suiviCount = e.suivis?.length || 0;
-    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
             <div class="flex items-center gap-4">
@@ -3835,7 +4064,7 @@ function renderMateriels() {
     }
 
     const isSsiap2 = currentUser?.qualification === 'SSIAP 2';
-    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
     const canModify = isSsiap2 || isSsiap3; // SSIAP 2 et 3 peuvent modifier
     const canCreate = isSsiap3; // Seul SSIAP 3 peut créer
     const canDelete = isSsiap3; // Seul SSIAP 3 peut supprimer
@@ -4702,7 +4931,7 @@ function editMat(id) {
     const m = DB.materiels.find(x => x.id === id);
     if (!m) return;
 
-    const isSsiap3 = currentUser?.qualification === 'SSIAP 3';
+    const isSsiap3 = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
     const isSsiap2 = currentUser?.qualification === 'SSIAP 2';
 
     // SSIAP 2 : formulaire simplifié (statut + dernière maintenance seulement)
@@ -5180,7 +5409,7 @@ function renderConsignes() {
     const filteredConsignes = DB.consignes.filter(c => {
         if (c.destinataire === 'Tout le monde') return true;
         if (c.destinataire === 'Chef de poste' && currentUser?.qualification !== 'SSIAP 1') return true;
-        if (c.destinataire === 'Chef de service' && currentUser?.qualification === 'SSIAP 3') return true;
+        if (c.destinataire === 'Chef de service' && (currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur')) return true;
         return false;
     });
 
@@ -5289,32 +5518,100 @@ function toggleConsigne(id) {
 }
 
 // ========== AGENTS ==========
+let filtreAgentQualif = '';
+let filtreAgentStatut = '';
+
 function renderAgents() {
+    // Filtrer les agents
+    let agentsFiltres = [...DB.agents];
+
+    if (filtreAgentQualif) {
+        agentsFiltres = agentsFiltres.filter(a => a.qualification === filtreAgentQualif);
+    }
+    if (filtreAgentStatut === 'actif') {
+        agentsFiltres = agentsFiltres.filter(a => a.actif);
+    } else if (filtreAgentStatut === 'inactif') {
+        agentsFiltres = agentsFiltres.filter(a => !a.actif);
+    }
+
+    // Trier
+    agentsFiltres.sort((a, b) => {
+        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
+        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
+    });
+
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-users mr-2 text-primary-500"></i>Agents</h1>
-            <button onclick="showModalAgent()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel agent</button>
+            <div class="flex gap-2">
+                <button onclick="imprimerListeAgents()" class="btn btn-secondary"><i class="fas fa-print mr-2"></i>Imprimer</button>
+                <button onclick="showModalAgent()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel agent</button>
+            </div>
         </div>
+
+        <!-- Filtres -->
+        <div class="card mb-4">
+            <div class="p-4">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="block text-sm font-semibold mb-2">Qualification</label>
+                        <select id="filtreAgentQualif" class="input" onchange="filtreAgentQualif=this.value; navigate('agents')">
+                            <option value="">Toutes</option>
+                            <option value="Administrateur" ${filtreAgentQualif === 'Administrateur' ? 'selected' : ''}>Administrateur</option>
+                            <option value="SSIAP 3" ${filtreAgentQualif === 'SSIAP 3' ? 'selected' : ''}>SSIAP 3</option>
+                            <option value="SSIAP 2" ${filtreAgentQualif === 'SSIAP 2' ? 'selected' : ''}>SSIAP 2</option>
+                            <option value="SSIAP 1" ${filtreAgentQualif === 'SSIAP 1' ? 'selected' : ''}>SSIAP 1</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="block text-sm font-semibold mb-2">Statut</label>
+                        <select id="filtreAgentStatut" class="input" onchange="filtreAgentStatut=this.value; navigate('agents')">
+                            <option value="">Tous</option>
+                            <option value="actif" ${filtreAgentStatut === 'actif' ? 'selected' : ''}>Actifs</option>
+                            <option value="inactif" ${filtreAgentStatut === 'inactif' ? 'selected' : ''}>Inactifs</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button onclick="filtreAgentQualif=''; filtreAgentStatut=''; navigate('agents')" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-times mr-1"></i>Réinitialiser
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
+            <div class="p-3 border-b dark:border-slate-600 flex justify-between items-center">
+                <span class="text-sm text-gray-500">${agentsFiltres.length} agent(s) trouvé(s)</span>
+            </div>
             <div class="overflow-x-auto">
-                <table class="table">
-                    <thead><tr><th>Agent</th><th>Qualification</th><th>Entreprise</th><th>Statut</th><th>Actions</th></tr></thead>
+                <table class="table" id="tableAgents">
+                    <thead><tr><th>Agent</th><th>Qualification</th><th>Entreprise</th><th>Téléphone</th><th>Statut</th><th>Actions</th></tr></thead>
                     <tbody>
-                        ${DB.agents.map(a => `
+                        ${agentsFiltres.map(a => `
                             <tr>
                                 <td>
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl gradient-header flex items-center justify-center text-white font-semibold">${a.prenom[0]}${a.nom[0]}</div>
-                                        <div class="font-medium">${a.prenom} ${a.nom}</div>
+                                        <div class="w-10 h-10 rounded-xl gradient-header flex items-center justify-center text-white font-semibold">${a.prenom?.[0] || ''}${a.nom?.[0] || ''}</div>
+                                        <div>
+                                            <div class="font-medium">${a.prenom} ${a.nom}</div>
+                                            <div class="text-xs text-gray-500">${a.email || ''}</div>
+                                        </div>
                                     </div>
                                 </td>
                                 <td><span class="badge badge-info">${a.qualification}</span></td>
-                                <td>${a.entreprise}</td>
+                                <td>${a.entreprise || ''}</td>
+                                <td class="text-sm">${a.telephone || '-'}</td>
                                 <td><span class="badge ${a.actif ? 'badge-success' : 'badge-danger'}">${a.actif ? 'Actif' : 'Inactif'}</span></td>
-                                <td>
-                                    <button onclick="voirAgent(${a.id})" class="btn btn-icon btn-secondary btn-sm" title="Voir la fiche">
+                                <td class="flex gap-1">
+                                    <button onclick="voirAgent('${a.id}')" class="btn btn-icon btn-secondary btn-sm" title="Voir la fiche">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    ${currentUser?.qualification === 'Administrateur' ? `
+                                    <button onclick="supprimerAgent('${a.id}')" class="btn btn-icon btn-sm bg-red-500 hover:bg-red-600 text-white" title="Supprimer">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    ` : ''}
                                 </td>
                             </tr>
                         `).join('')}
@@ -5326,8 +5623,11 @@ function renderAgents() {
 }
 
 function voirAgent(id) {
-    const a = DB.agents.find(x => x.id === id);
+    const a = DB.agents.find(x => String(x.id) === String(id));
     if (!a) return;
+
+    const isAdmin = a.qualification === 'Administrateur';
+    const pinActuel = obtenirCodePin(a);
 
     showModal('Fiche Agent', `
         <div class="space-y-4">
@@ -5340,6 +5640,11 @@ function voirAgent(id) {
                 </div>
             </div>
 
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                <div class="text-sm font-semibold text-blue-700 dark:text-blue-400">Code PIN actuel :</div>
+                <div class="text-2xl font-mono font-bold text-blue-600 dark:text-blue-300">${pinActuel}</div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="block text-sm font-semibold mb-2">Prénom</label><input type="text" id="editAgentPrenom" class="input" value="${a.prenom}"></div>
                 <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="editAgentNom" class="input" value="${a.nom}"></div>
@@ -5348,7 +5653,8 @@ function voirAgent(id) {
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-semibold mb-2">Qualification</label>
-                    <select id="editAgentQualif" class="input">
+                    <select id="editAgentQualif" class="input" onchange="toggleAgentFields()">
+                        <option ${a.qualification === 'Administrateur' ? 'selected' : ''}>Administrateur</option>
                         <option ${a.qualification === 'SSIAP 1' ? 'selected' : ''}>SSIAP 1</option>
                         <option ${a.qualification === 'SSIAP 2' ? 'selected' : ''}>SSIAP 2</option>
                         <option ${a.qualification === 'SSIAP 3' ? 'selected' : ''}>SSIAP 3</option>
@@ -5357,16 +5663,34 @@ function voirAgent(id) {
                 <div><label class="block text-sm font-semibold mb-2">Entreprise</label><input type="text" id="editAgentEntr" class="input" value="${a.entreprise}"></div>
             </div>
 
-            <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="editAgentEmail" class="input" value="${a.email || ''}"></div>
-
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Date diplôme</label><input type="date" id="editAgentDiplome" class="input" value="${a.dateDiplome || ''}"></div>
-                <div><label class="block text-sm font-semibold mb-2">Date dernier recyclage</label><input type="date" id="editAgentRecyclage" class="input" value="${a.dateRecyclage || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="editAgentEmail" class="input" value="${a.email || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Téléphone</label><input type="tel" id="editAgentTelephone" class="input" value="${a.telephone || ''}"></div>
+            </div>
+
+            <!-- Champs Administrateur (code PIN) -->
+            <div id="editFieldsAdmin" class="${isAdmin ? '' : 'hidden'} bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg">
+                <label class="block text-sm font-semibold mb-2">Nouveau code PIN (6 chiffres)</label>
+                <input type="text" id="editAgentCodePin" class="input" maxlength="6" pattern="[0-9]{6}" value="${a.codePin || ''}" placeholder="Laisser vide pour conserver">
+                <p class="text-xs text-gray-500 mt-1">Laissez vide pour conserver le code actuel</p>
+            </div>
+
+            <!-- Champs SSIAP (diplôme, recyclage) -->
+            <div id="editFieldsSsiap" class="${isAdmin ? 'hidden' : ''}">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-semibold mb-2">Date diplôme</label><input type="date" id="editAgentDiplome" class="input" value="${a.dateDiplome || ''}"></div>
+                    <div><label class="block text-sm font-semibold mb-2">Date dernier recyclage</label><input type="date" id="editAgentRecyclage" class="input" value="${a.dateRecyclage || ''}"></div>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="editAgentDebutContrat" class="input" value="${a.dateDebutContrat || ''}"></div>
+                <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="editAgentDebutContrat" class="input" value="${a.dateDebutContrat || ''}" onchange="updateEditPinPreview()"></div>
                 <div><label class="block text-sm font-semibold mb-2">Date fin contrat</label><input type="date" id="editAgentFinContrat" class="input" value="${a.dateFinContrat || ''}"></div>
+            </div>
+
+            <div id="editPinPreview" class="${isAdmin ? 'hidden' : ''} bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg">
+                <div class="text-sm font-semibold text-yellow-700 dark:text-yellow-400">⚠️ Nouveau PIN si date contrat modifiée :</div>
+                <div id="editPinPreviewValue" class="text-2xl font-mono font-bold text-yellow-600 dark:text-yellow-300">${pinActuel}</div>
             </div>
 
             <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
@@ -5381,15 +5705,30 @@ function voirAgent(id) {
         const prenom = document.getElementById('editAgentPrenom').value;
         const nom = document.getElementById('editAgentNom').value;
         const email = document.getElementById('editAgentEmail').value;
+        const qualification = document.getElementById('editAgentQualif').value;
+
         if (!prenom || !nom) return showToast('Remplissez les champs obligatoires', 'error');
+
+        // Validation PIN pour admin
+        if (qualification === 'Administrateur') {
+            const newPin = document.getElementById('editAgentCodePin').value;
+            if (newPin && (newPin.length !== 6 || !/^\d{6}$/.test(newPin))) {
+                return showToast('Le code PIN doit contenir 6 chiffres', 'error');
+            }
+            if (newPin) a.codePin = newPin;
+        }
 
         a.prenom = prenom;
         a.nom = nom;
-        a.qualification = document.getElementById('editAgentQualif').value;
+        a.qualification = qualification;
         a.entreprise = document.getElementById('editAgentEntr').value;
         a.email = email;
-        a.dateDiplome = document.getElementById('editAgentDiplome').value || null;
-        a.dateRecyclage = document.getElementById('editAgentRecyclage').value || null;
+        a.telephone = document.getElementById('editAgentTelephone').value || null;
+
+        if (qualification !== 'Administrateur') {
+            a.dateDiplome = document.getElementById('editAgentDiplome').value || null;
+            a.dateRecyclage = document.getElementById('editAgentRecyclage').value || null;
+        }
         a.dateDebutContrat = document.getElementById('editAgentDebutContrat').value || null;
         a.dateFinContrat = document.getElementById('editAgentFinContrat').value || null;
 
@@ -5418,6 +5757,132 @@ function voirAgent(id) {
     }, 'Enregistrer');
 }
 
+function imprimerListeAgents() {
+    // Récupérer les agents filtrés
+    let agentsFiltres = [...DB.agents];
+
+    if (filtreAgentQualif) {
+        agentsFiltres = agentsFiltres.filter(a => a.qualification === filtreAgentQualif);
+    }
+    if (filtreAgentStatut === 'actif') {
+        agentsFiltres = agentsFiltres.filter(a => a.actif);
+    } else if (filtreAgentStatut === 'inactif') {
+        agentsFiltres = agentsFiltres.filter(a => !a.actif);
+    }
+
+    agentsFiltres.sort((a, b) => {
+        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
+        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
+    });
+
+    const filtreTexte = [];
+    if (filtreAgentQualif) filtreTexte.push(filtreAgentQualif);
+    if (filtreAgentStatut) filtreTexte.push(filtreAgentStatut === 'actif' ? 'Actifs' : 'Inactifs');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Liste des Agents - SSIAP Patrol</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { color: #4f46e5; margin-bottom: 5px; }
+                .subtitle { color: #666; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background-color: #4f46e5; color: white; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+                .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+                .badge-actif { background: #22c55e; color: white; }
+                .badge-inactif { background: #ef4444; color: white; }
+                .footer { margin-top: 30px; text-align: center; color: #999; font-size: 12px; }
+                @media print {
+                    body { padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>📋 Liste des Agents</h1>
+            <div class="subtitle">
+                ${filtreTexte.length > 0 ? 'Filtres: ' + filtreTexte.join(', ') : 'Tous les agents'}
+                | ${agentsFiltres.length} agent(s) | Imprimé le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Prénom</th>
+                        <th>Qualification</th>
+                        <th>Téléphone</th>
+                        <th>Email</th>
+                        <th>Entreprise</th>
+                        <th>Statut</th>
+                        <th>Code PIN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${agentsFiltres.map(a => `
+                        <tr>
+                            <td><strong>${a.nom}</strong></td>
+                            <td>${a.prenom}</td>
+                            <td>${a.qualification}</td>
+                            <td>${a.telephone || '-'}</td>
+                            <td>${a.email || '-'}</td>
+                            <td>${a.entreprise || '-'}</td>
+                            <td><span class="badge ${a.actif ? 'badge-actif' : 'badge-inactif'}">${a.actif ? 'Actif' : 'Inactif'}</span></td>
+                            <td><strong>${obtenirCodePin(a)}</strong></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="footer">
+                SSIAP Patrol - Système de gestion des rondes
+            </div>
+            <script>
+                window.onload = function() { window.print(); }
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+function supprimerAgent(id) {
+    const agent = DB.agents.find(a => String(a.id) === String(id));
+    if (!agent) return;
+
+    // Empêcher la suppression de son propre compte
+    if (String(currentUser?.id) === String(id)) {
+        showToast('Vous ne pouvez pas supprimer votre propre compte', 'error');
+        return;
+    }
+
+    showModal('Confirmer la suppression', `
+        <div class="space-y-4">
+            <div class="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-3"></i>
+                <div class="font-bold text-red-700 dark:text-red-400 text-lg">Supprimer cet agent ?</div>
+            </div>
+            <div class="text-center">
+                <div class="text-xl font-bold">${agent.prenom} ${agent.nom}</div>
+                <div class="text-gray-500">${agent.qualification}</div>
+            </div>
+            <div class="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg text-sm text-yellow-700 dark:text-yellow-400">
+                <i class="fas fa-info-circle mr-2"></i>Cette action est irréversible. Toutes les données associées à cet agent seront conservées dans l'historique.
+            </div>
+        </div>
+    `, () => {
+        DB.agents = DB.agents.filter(a => a.id !== id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Agent supprimé', 'warning');
+        navigate('agents');
+        initLogin();
+    }, 'Supprimer', 'btn-danger');
+}
+
 function showModalAgent() {
     showModal('Nouvel Agent', `
         <div class="space-y-4">
@@ -5426,34 +5891,62 @@ function showModalAgent() {
                 <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="agentNom" class="input"></div>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Qualification</label><select id="agentQualif" class="input"><option>SSIAP 1</option><option>SSIAP 2</option><option>SSIAP 3</option></select></div>
+                <div><label class="block text-sm font-semibold mb-2">Qualification</label><select id="agentQualif" class="input" onchange="toggleAgentFields()"><option>Administrateur</option><option>SSIAP 1</option><option>SSIAP 2</option><option>SSIAP 3</option></select></div>
                 <div><label class="block text-sm font-semibold mb-2">Entreprise</label><input type="text" id="agentEntr" class="input" value="SecuriPlus"></div>
             </div>
-            <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="agentEmail" class="input" placeholder="nom@entreprise.fr"></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Date diplôme</label><input type="date" id="agentDiplome" class="input"></div>
-                <div><label class="block text-sm font-semibold mb-2">Date dernier recyclage</label><input type="date" id="agentRecyclage" class="input"></div>
+                <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="agentEmail" class="input" placeholder="nom@entreprise.fr"></div>
+                <div><label class="block text-sm font-semibold mb-2">Téléphone</label><input type="tel" id="agentTelephone" class="input" placeholder="06 12 34 56 78"></div>
+            </div>
+            <!-- Champs Administrateur (code PIN) -->
+            <div id="fieldsAdmin" class="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg">
+                <label class="block text-sm font-semibold mb-2">Code PIN (6 chiffres)</label>
+                <input type="text" id="agentCodePin" class="input" maxlength="6" pattern="[0-9]{6}" placeholder="123456">
+                <p class="text-xs text-gray-500 mt-1">Ce code sera utilisé pour la connexion</p>
+            </div>
+            <!-- Champs SSIAP (diplôme, recyclage) -->
+            <div id="fieldsSsiap" class="hidden">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-semibold mb-2">Date diplôme</label><input type="date" id="agentDiplome" class="input"></div>
+                    <div><label class="block text-sm font-semibold mb-2">Date dernier recyclage</label><input type="date" id="agentRecyclage" class="input"></div>
+                </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="agentDebutContrat" class="input"></div>
+                <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="agentDebutContrat" class="input" onchange="updatePinPreview()"></div>
                 <div><label class="block text-sm font-semibold mb-2">Date fin contrat (optionnel)</label><input type="date" id="agentFinContrat" class="input"></div>
+            </div>
+            <div id="pinPreview" class="hidden bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                <div class="text-sm font-semibold text-blue-700 dark:text-blue-400">Code PIN généré automatiquement :</div>
+                <div id="pinPreviewValue" class="text-2xl font-mono font-bold text-blue-600 dark:text-blue-300">------</div>
+                <p class="text-xs text-gray-500 mt-1">Basé sur la date de début de contrat</p>
             </div>
         </div>
     `, () => {
         const prenom = document.getElementById('agentPrenom').value;
         const nom = document.getElementById('agentNom').value;
         const email = document.getElementById('agentEmail').value;
+        const qualification = document.getElementById('agentQualif').value;
+
         if (!prenom || !nom || !email) return showToast('Remplissez les champs obligatoires', 'error');
+
+        if (qualification === 'Administrateur') {
+            const pin = document.getElementById('agentCodePin').value;
+            if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+                return showToast('Le code PIN doit contenir 6 chiffres', 'error');
+            }
+        }
 
         const nouvelAgent = {
             id: genId(),
             prenom,
             nom,
-            qualification: document.getElementById('agentQualif').value,
+            qualification,
             entreprise: document.getElementById('agentEntr').value,
             email,
-            dateDiplome: document.getElementById('agentDiplome').value || null,
-            dateRecyclage: document.getElementById('agentRecyclage').value || null,
+            telephone: document.getElementById('agentTelephone').value || null,
+            codePin: qualification === 'Administrateur' ? document.getElementById('agentCodePin').value : null,
+            dateDiplome: qualification !== 'Administrateur' ? (document.getElementById('agentDiplome').value || null) : null,
+            dateRecyclage: qualification !== 'Administrateur' ? (document.getElementById('agentRecyclage').value || null) : null,
             dateDebutContrat: document.getElementById('agentDebutContrat').value || null,
             dateFinContrat: document.getElementById('agentFinContrat').value || null,
             actif: true
@@ -5467,6 +5960,69 @@ function showModalAgent() {
         navigate('agents');
         initLogin();
     });
+
+    // Initialiser l'affichage des champs
+    setTimeout(toggleAgentFields, 100);
+}
+
+function toggleAgentFields() {
+    const qual = document.getElementById('agentQualif')?.value || document.getElementById('editAgentQualif')?.value;
+    const isAdmin = qual === 'Administrateur';
+
+    // Formulaire création
+    const fieldsAdmin = document.getElementById('fieldsAdmin');
+    const fieldsSsiap = document.getElementById('fieldsSsiap');
+    const pinPreview = document.getElementById('pinPreview');
+
+    if (fieldsAdmin) fieldsAdmin.classList.toggle('hidden', !isAdmin);
+    if (fieldsSsiap) fieldsSsiap.classList.toggle('hidden', isAdmin);
+    if (pinPreview) pinPreview.classList.toggle('hidden', isAdmin);
+
+    // Mettre à jour le preview du PIN pour SSIAP
+    if (!isAdmin && pinPreview) {
+        const dateDebut = document.getElementById('agentDebutContrat')?.value;
+        if (dateDebut) {
+            const pin = genererCodePin(dateDebut);
+            document.getElementById('pinPreviewValue').textContent = pin;
+        } else {
+            document.getElementById('pinPreviewValue').textContent = '------';
+        }
+    }
+
+    // Formulaire modification
+    const editFieldsAdmin = document.getElementById('editFieldsAdmin');
+    const editFieldsSsiap = document.getElementById('editFieldsSsiap');
+    const editPinPreview = document.getElementById('editPinPreview');
+
+    if (editFieldsAdmin) editFieldsAdmin.classList.toggle('hidden', !isAdmin);
+    if (editFieldsSsiap) editFieldsSsiap.classList.toggle('hidden', isAdmin);
+    if (editPinPreview) editPinPreview.classList.toggle('hidden', isAdmin);
+}
+
+function updatePinPreview() {
+    const dateDebut = document.getElementById('agentDebutContrat')?.value;
+    const qual = document.getElementById('agentQualif')?.value;
+
+    if (qual !== 'Administrateur' && dateDebut) {
+        const pin = genererCodePin(dateDebut);
+        const previewEl = document.getElementById('pinPreviewValue');
+        if (previewEl) previewEl.textContent = pin;
+
+        // Afficher le preview
+        const pinPreview = document.getElementById('pinPreview');
+        if (pinPreview) pinPreview.classList.remove('hidden');
+    }
+}
+
+function updateEditPinPreview() {
+    const dateDebut = document.getElementById('editAgentDebutContrat')?.value;
+    const qual = document.getElementById('editAgentQualif')?.value;
+
+    if (qual !== 'Administrateur' && dateDebut) {
+        const pin = genererCodePin(dateDebut);
+        const previewEl = document.getElementById('editPinPreviewValue');
+        if (previewEl) previewEl.textContent = pin;
+    }
 }
 
 
@@ -6223,6 +6779,22 @@ function supprimerPhoto(inputId, containerId) {
 
     if (input) input.value = '';
     if (container) container.classList.add('hidden');
+}
+
+function afficherPhotoPleinEcran(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4';
+    overlay.onclick = () => overlay.remove();
+    overlay.innerHTML = `
+        <div class="relative max-w-full max-h-full">
+            <img src="${src}" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl">
+            <button onclick="event.stopPropagation(); this.closest('.fixed').remove()"
+                    class="absolute top-2 right-2 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white text-xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
 }
 
 // Convertir un fichier image en base64 (avec compression)
