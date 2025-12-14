@@ -317,6 +317,7 @@ const firebaseConfig = {
 let firebaseApp = null;
 let db = null;
 let firestoreEnabled = false;
+let donneesChargees = false; // IMPORTANT: Flag pour bloquer les sauvegardes avant chargement
 
 try {
     if (typeof firebase !== 'undefined') {
@@ -325,9 +326,7 @@ try {
         firestoreEnabled = true;
         console.log('Firebase initialisé avec succès');
         updateFirebaseStatus(true);
-        // Ne pas charger automatiquement ici - laisser l'init décider
-        // Activer la synchronisation en temps réel
-        activerSyncTempsReel();
+        // NE PAS appeler activerSyncTempsReel ici - on le fera après le chargement initial
     }
 } catch (e) {
     console.log('Firebase non disponible:', e);
@@ -351,6 +350,12 @@ function updateFirebaseStatus(connected) {
 function sauvegarderVersFirebase() {
     if (!firestoreEnabled || !db) return;
 
+    // PROTECTION: Ne jamais sauvegarder si les données n'ont pas été chargées
+    if (!donneesChargees) {
+        console.warn('⚠️ BLOQUÉ: Tentative de sauvegarde avant chargement des données');
+        return;
+    }
+
     try {
         const saveData = {
             version: '1.0',
@@ -364,8 +369,9 @@ function sauvegarderVersFirebase() {
             consignes: DB.consignes
         };
 
+        console.log('💾 Sauvegarde Firebase - prisesPoste:', DB.prisesPoste.length);
         db.collection('ssiap-patrol').doc('data').set(saveData)
-            .then(() => console.log('Données sauvegardées dans Firebase'))
+            .then(() => console.log('✅ Données sauvegardées dans Firebase'))
             .catch(err => console.error('Erreur sauvegarde Firebase:', err));
     } catch (e) {
         console.error('Erreur lors de la sauvegarde Firebase:', e);
@@ -374,6 +380,7 @@ function sauvegarderVersFirebase() {
 
 function chargerDepuisFirebase(callback) {
     if (!firestoreEnabled || !db) {
+        donneesChargees = true; // Marquer comme chargé même sans Firebase
         if (callback) callback();
         return;
     }
@@ -390,19 +397,28 @@ function chargerDepuisFirebase(callback) {
                     DB.evenements = data.evenements || [];
                     DB.mainCourante = data.mainCourante || [];
                     DB.consignes = data.consignes || DB.consignes;
-                    console.log('Données chargées depuis Firebase');
+                    console.log('✅ Données chargées depuis Firebase');
+                    console.log('📊 prisesPoste chargées:', DB.prisesPoste.length);
+                } else {
+                    console.log('⚠️ Document Firebase non trouvé - utilisation des données par défaut');
                 }
+                // IMPORTANT: Marquer les données comme chargées MAINTENANT
+                donneesChargees = true;
+                console.log('🔓 Sauvegardes autorisées maintenant');
+
                 // Toujours appeler le callback, même si pas de données
                 if (callback) callback();
                 else initLogin();
             })
             .catch(err => {
                 console.error('Erreur chargement Firebase:', err);
+                donneesChargees = true; // Permettre quand même les sauvegardes
                 if (callback) callback();
                 else initLogin();
             });
     } catch (e) {
         console.error('Erreur lors du chargement Firebase:', e);
+        donneesChargees = true;
         if (callback) callback();
         else initLogin();
     }
@@ -3576,10 +3592,15 @@ if (firestoreEnabled) {
         console.log('✅ Données Firebase chargées');
         console.log('📊 Prises de poste:', DB.prisesPoste.length);
         console.log('📊 Agents en poste:', getAgentsEnPoste().length);
+
+        // Activer la sync temps réel APRÈS le chargement initial
+        activerSyncTempsReel();
+
         demarrerApplication();
     });
 } else {
     // Pas de Firebase, démarrer directement
+    donneesChargees = true;
     demarrerApplication();
 }
 </script>
