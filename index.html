@@ -40,6 +40,10 @@
             <div><label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Code PIN</label><div class="relative"><input type="password" id="loginPassword" class="input pr-12" placeholder="••••••" maxlength="6" inputmode="numeric"><button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"><i id="eyeIcon" class="fas fa-eye text-xl"></i></button></div></div>
             <div id="loginError" class="text-red-500 text-sm font-medium hidden"></div>
             <button onclick="login()" class="btn btn-primary w-full justify-center py-3"><i class="fas fa-sign-in-alt"></i> Se connecter</button>
+            <div class="pt-4 border-t border-gray-200">
+                <button onclick="reinitialiserFirebase()" class="btn btn-danger w-full justify-center btn-sm"><i class="fas fa-trash"></i> Réinitialiser la base de données</button>
+                <p class="text-xs text-gray-400 text-center mt-2">Uniquement si problème de connexion</p>
+            </div>
         </div>
     </div>
 </div>
@@ -108,23 +112,35 @@
 <div id="modalContainer"></div>
 
 <script>
-const DB={agents:[
-    {id:3,nom:'Boyer',prenom:'Michel',qualification:'Administrateur',entreprise:'SecuriPlus',actif:true,email:'admin@securiplus.fr',codePin:'123456',dateDebutContrat:'2018-12-01'},
-    {id:1,nom:'Martin',prenom:'Jean-Pierre',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-06-01'},
-    {id:2,nom:'Dupont',prenom:'Alain',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2019-04-01'},
-    {id:4,nom:'Dubois',prenom:'Marie',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2021-02-01'},
-    {id:5,nom:'Garcia',prenom:'Pierre',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-10-01'},
-    {id:6,nom:'Leroy',prenom:'François',qualification:'SSIAP 3',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2017-08-01'}
-],materiels:[
-    {id:1,nom:'Extincteur CO2 5kg - Hall',type:'Extincteur',localisation:'Bâtiment Principal > RDC > Hall',statut:'Opérationnel',codeQR:'MAT-EXT-001'},
-    {id:2,nom:'RIA DN25 - Couloir 2ème',type:'RIA',localisation:'Bâtiment Principal > 2ème étage',statut:'Opérationnel',codeQR:'MAT-RIA-001'},
-    {id:3,nom:'Détecteur Optique B05',type:'Détecteur',localisation:'Bâtiment Principal > 2ème étage',statut:'À vérifier',codeQR:'MAT-DET-001'},
-    {id:4,nom:'PCF Escalier A',type:'Porte CF',localisation:'Bâtiment Principal > RDC',statut:'Opérationnel',codeQR:'MAT-PCF-001'},
-    {id:5,nom:'Extincteur Eau 6L - Cuisine',type:'Extincteur',localisation:'Bâtiment Annexe > 1er étage',statut:'En maintenance',codeQR:'MAT-EXT-002'}
-],prisesPoste:[],rondes:[],evenements:[],mainCourante:[],consignes:[
-    {id:1,titre:'Visite commission de sécurité',niveau:'Particulière',priorite:'Haute',contenu:'Commission de sécurité prévue le 15 octobre 2025.',active:true},
-    {id:2,titre:'Contrôle accès livraisons',niveau:'Courante',priorite:'Normale',contenu:'Vérifier systématiquement les bons de livraison.',active:true}
-]};
+// Données par défaut
+const DEFAULT_DB = {
+    agents: [
+        {id:1,nom:'Boyer',prenom:'Michel',qualification:'Administrateur',entreprise:'SecuriPlus',actif:true,email:'admin@securiplus.fr',codePin:'123456',dateDebutContrat:'2018-12-01'},
+        {id:2,nom:'Martin',prenom:'Jean-Pierre',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-06-01'},
+        {id:3,nom:'Dupont',prenom:'Alain',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2019-04-01'},
+        {id:4,nom:'Dubois',prenom:'Marie',qualification:'SSIAP 2',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2021-02-01'},
+        {id:5,nom:'Garcia',prenom:'Pierre',qualification:'SSIAP 1',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2020-10-01'},
+        {id:6,nom:'Leroy',prenom:'François',qualification:'SSIAP 3',entreprise:'SecuriPlus',actif:true,dateDebutContrat:'2017-08-01'}
+    ],
+    materiels: [
+        {id:1,nom:'Extincteur CO2 5kg - Hall',type:'Extincteur',localisation:'Bâtiment Principal > RDC > Hall',statut:'Opérationnel',codeQR:'MAT-EXT-001'},
+        {id:2,nom:'RIA DN25 - Couloir 2ème',type:'RIA',localisation:'Bâtiment Principal > 2ème étage',statut:'Opérationnel',codeQR:'MAT-RIA-001'},
+        {id:3,nom:'Détecteur Optique B05',type:'Détecteur',localisation:'Bâtiment Principal > 2ème étage',statut:'À vérifier',codeQR:'MAT-DET-001'},
+        {id:4,nom:'PCF Escalier A',type:'Porte CF',localisation:'Bâtiment Principal > RDC',statut:'Opérationnel',codeQR:'MAT-PCF-001'},
+        {id:5,nom:'Extincteur Eau 6L - Cuisine',type:'Extincteur',localisation:'Bâtiment Annexe > 1er étage',statut:'En maintenance',codeQR:'MAT-EXT-002'}
+    ],
+    prisesPoste: [],
+    rondes: [],
+    evenements: [],
+    mainCourante: [],
+    consignes: [
+        {id:1,titre:'Visite commission de sécurité',niveau:'Particulière',priorite:'Haute',contenu:'Commission de sécurité prévue le 15 octobre 2025.',active:true},
+        {id:2,titre:'Contrôle accès livraisons',niveau:'Courante',priorite:'Normale',contenu:'Vérifier systématiquement les bons de livraison.',active:true}
+    ]
+};
+
+// Copie de travail
+let DB = JSON.parse(JSON.stringify(DEFAULT_DB));
 
 let currentUser=null,currentView='dashboard',modalConfirmCallback=null,html5QrScanner=null,currentScanningPointId=null,currentScanningRondeId=null,selectedRondierAgentId=null;
 
@@ -141,6 +157,38 @@ let db=null,firestoreEnabled=false,donneesChargees=false;
 try{if(typeof firebase!=='undefined'){firebase.initializeApp(firebaseConfig);db=firebase.firestore();firestoreEnabled=true;updateFirebaseStatus(true)}}catch(e){updateFirebaseStatus(false)}
 
 function updateFirebaseStatus(c){setTimeout(()=>{const el=document.getElementById('firebaseStatus');if(el)el.innerHTML=c?'<span class="text-green-600"><i class="fas fa-cloud"></i> Firebase connecté</span>':'<span class="text-red-600"><i class="fas fa-cloud-slash"></i> Hors ligne</span>'},100)}
+
+// FONCTION DE RÉINITIALISATION
+function reinitialiserFirebase(){
+    if(!confirm('⚠️ ATTENTION !\n\nCette action va SUPPRIMER toutes les données et réinitialiser la base.\n\nÊtes-vous sûr ?')) return;
+    
+    // Réinitialiser les données locales
+    DB = JSON.parse(JSON.stringify(DEFAULT_DB));
+    
+    // Sauvegarder vers Firebase
+    if(firestoreEnabled && db){
+        db.collection('ssiap-patrol').doc('data').set({
+            version:'1.0',
+            date:new Date().toISOString(),
+            agents:DB.agents,
+            materiels:DB.materiels,
+            prisesPoste:[],
+            rondes:[],
+            evenements:[],
+            mainCourante:[],
+            consignes:DB.consignes,
+            configEtablissement:configEtablissement
+        }).then(()=>{
+            alert('✅ Base de données réinitialisée !\n\nConnectez-vous avec :\n- Michel Boyer - Administrateur\n- Code PIN : 123456');
+            location.reload();
+        }).catch(e=>{
+            alert('❌ Erreur : '+e.message);
+        });
+    } else {
+        alert('✅ Données locales réinitialisées');
+        initLoginPrincipal();
+    }
+}
 
 function sauvegarderVersFirebase(){if(!firestoreEnabled||!db||!donneesChargees)return;db.collection('ssiap-patrol').doc('data').set({version:'1.0',date:new Date().toISOString(),agents:DB.agents,materiels:DB.materiels,prisesPoste:DB.prisesPoste,rondes:DB.rondes,evenements:DB.evenements,mainCourante:DB.mainCourante,consignes:DB.consignes,configEtablissement:configEtablissement}).catch(e=>console.error('Erreur:',e))}
 
@@ -191,7 +239,7 @@ function rechargerAgentsRondier(){showToast('🔄 Actualisation...','info');affi
 
 function logout(){currentUser=null;selectedRondierAgentId=null;if(detecterModeRondier())afficherLoginRondier();else afficherLoginPrincipal()}
 
-const menuItems=[{id:'dashboard',icon:'fa-tachometer-alt',label:'Tableau de bord',ssiap1:false,ssiap2:true,ssiap3:true,admin:true},{id:'prisePoste',icon:'fa-user-clock',label:'Prise de Poste',ssiap1:false,ssiap2:true,ssiap3:false,admin:false},{id:'rondes',icon:'fa-route',label:'Rondes',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'mainCourante',icon:'fa-clipboard-list',label:'Main Courante',ssiap1:false,ssiap2:true,ssiap3:true,admin:true},{id:'materiels',icon:'fa-fire-extinguisher',label:'Matériels',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'consignes',icon:'fa-file-alt',label:'Consignes',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'agents',icon:'fa-users',label:'Agents',ssiap1:false,ssiap2:false,ssiap3:true,admin:true},{id:'administration',icon:'fa-cogs',label:'Administration',ssiap1:false,ssiap2:false,ssiap3:false,admin:true}];
+const menuItems=[{id:'dashboard',icon:'fa-tachometer-alt',label:'Tableau de bord',ssiap1:false,ssiap2:true,ssiap3:true,admin:true},{id:'prisePoste',icon:'fa-user-clock',label:'Prise de Poste',ssiap1:false,ssiap2:true,ssiap3:false,admin:true},{id:'rondes',icon:'fa-route',label:'Rondes',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'mainCourante',icon:'fa-clipboard-list',label:'Main Courante',ssiap1:false,ssiap2:true,ssiap3:true,admin:true},{id:'materiels',icon:'fa-fire-extinguisher',label:'Matériels',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'consignes',icon:'fa-file-alt',label:'Consignes',ssiap1:true,ssiap2:true,ssiap3:true,admin:true},{id:'agents',icon:'fa-users',label:'Agents',ssiap1:false,ssiap2:false,ssiap3:true,admin:true},{id:'administration',icon:'fa-cogs',label:'Administration',ssiap1:false,ssiap2:false,ssiap3:false,admin:true}];
 
 function initApp(){renderNav();renderSidebarActions();updateMobileUI();navigate(currentUser?.qualification==='SSIAP 1'?'rondes':'dashboard')}
 
