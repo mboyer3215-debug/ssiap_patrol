@@ -1,3 +1,2756 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSIAP Patrol - Gestion Sécurité Incendie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
+                    colors: {
+                        primary: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                        accent: { 500: '#8b5cf6', 600: '#7c3aed' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; }
+
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .gradient-header { background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); }
+        .gradient-success { background: linear-gradient(90deg, #10b981 0%, #34d399 100%); }
+        .gradient-warning { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+        .gradient-danger { background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); }
+        .gradient-info { background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%); }
+
+        .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); }
+        .dark body { background: #0f172a; color: #e2e8f0; }
+
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
+        .dark .card { background: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+        .sidebar { width: 280px; background: white; height: 100vh; position: fixed; left: 0; top: 0; z-index: 50; transition: transform 0.3s; }
+        .dark .sidebar { background: #1e293b; }
+        .sidebar-hidden { transform: translateX(-100%); }
+
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; margin: 4px 12px; border-radius: 12px; color: #64748b; font-weight: 500; transition: all 0.2s; cursor: pointer; }
+        .nav-link:hover { background: #f1f5f9; color: #6366f1; }
+        .nav-link.active { background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
+        .dark .nav-link:hover { background: #334155; }
+
+        .btn { padding: 10px 20px; border-radius: 10px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none; }
+        .btn-primary { background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+        .btn-success { background: linear-gradient(90deg, #10b981, #34d399); color: white; }
+        .btn-danger { background: linear-gradient(90deg, #ef4444, #f87171); color: white; }
+        .btn-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); color: white; }
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .dark .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+        .btn-icon { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+
+        .input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white; }
+        .input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .dark .input { background: #0f172a; border-color: #334155; color: white; }
+
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #dcfce7; color: #16a34a; }
+        .badge-warning { background: #fef3c7; color: #d97706; }
+        .badge-danger { background: #fee2e2; color: #dc2626; }
+        .badge-info { background: #dbeafe; color: #2563eb; }
+        .badge-purple { background: #f3e8ff; color: #9333ea; }
+        .dark .badge-success { background: #166534; color: #bbf7d0; }
+        .dark .badge-warning { background: #92400e; color: #fde68a; }
+        .dark .badge-danger { background: #991b1b; color: #fecaca; }
+        .dark .badge-info { background: #1e40af; color: #bfdbfe; }
+        .dark .badge-purple { background: #581c87; color: #e9d5ff; }
+
+        .stat-card { padding: 20px; border-radius: 16px; text-align: center; }
+        .stat-card .icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 20px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; }
+        .stat-card .label { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+        .table { width: 100%; }
+        .table th { padding: 14px 16px; text-align: left; font-weight: 600; color: #64748b; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
+        .table td { padding: 16px; border-bottom: 1px solid #f1f5f9; }
+        .table tr:hover td { background: #f8fafc; }
+        .dark .table th { border-color: #334155; }
+        .dark .table td { border-color: #334155; }
+        .dark .table tr:hover td { background: #334155; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; backdrop-filter: blur(4px); }
+        .modal-content { background: white; border-radius: 20px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; animation: modalIn 0.3s; }
+        .dark .modal-content { background: #1e293b; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(-20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .modal-header { padding: 24px 24px 0; }
+        .modal-body { padding: 24px; }
+        .modal-footer { padding: 0 24px 24px; display: flex; gap: 12px; justify-content: flex-end; }
+
+        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+        .status-dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        .status-dot.orange { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+        .status-dot.green { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #e2e8f0; }
+        .dark .timeline::before { background: #334155; }
+        .timeline-item { position: relative; padding-bottom: 20px; }
+        .timeline-item::before { content: ''; position: absolute; left: -22px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; }
+        .dark .timeline-item::before { border-color: #1e293b; }
+
+        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .qr-card { padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; text-align: center; page-break-inside: avoid; }
+        .dark .qr-card { border-color: #334155; }
+
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0 !important; }
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+            .main-content { margin-left: 0 !important; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .mobile-nav-btn { transition: all 0.2s; }
+        .mobile-nav-btn:active { transform: scale(0.95); }
+        .mobile-nav-btn.active { color: #6366f1; }
+        .mobile-nav-btn.active i { color: #6366f1; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900">
+
+<!-- LOGIN PRINCIPAL -->
+<div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="card p-8 w-full max-w-md fade-in">
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 gradient-header rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-shield-alt text-white text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">SSIAP Patrol</h1>
+            <p class="text-gray-500 mt-1">Système de gestion des rondes</p>
+        </div>
+        <div class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Agent</label>
+                <select id="loginAgent" class="input"><option value="">Sélectionner un agent...</option></select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Code PIN</label>
+                <div class="relative">
+                    <input type="password" id="loginPassword" class="input pr-12" placeholder="••••••" maxlength="6" inputmode="numeric">
+                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                        <i id="eyeIcon" class="fas fa-eye text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="loginError" class="text-red-500 text-sm font-medium hidden"></div>
+            <button onclick="login()" class="btn btn-primary w-full justify-center py-3">
+                <i class="fas fa-sign-in-alt"></i> Se connecter
+            </button>
+            <div class="pt-4 border-t border-gray-200 mt-4">
+                <button onclick="accederModeRondier()" class="btn btn-secondary w-full justify-center">
+                    <i class="fas fa-mobile-alt"></i> Accès Rondier Mobile
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LOGIN RONDIER -->
+<div id="loginRondier" class="gradient-bg min-h-screen flex items-center justify-center p-4 hidden">
+    <div class="card p-6 w-full max-w-md fade-in">
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-walking text-white text-2xl"></i>
+            </div>
+            <h1 class="text-xl font-bold text-gray-800 dark:text-white">Connexion Rondier</h1>
+        </div>
+        <div id="rondierLoading" class="text-center py-8">
+            <i class="fas fa-sync-alt fa-spin text-3xl text-primary-500 mb-4"></i>
+            <p class="text-gray-500">Chargement...</p>
+        </div>
+        <div id="rondierContent" class="space-y-4 hidden">
+            <div id="rondierAgentsList" class="space-y-2"></div>
+            <div id="rondierNoAgent" class="text-center py-6 hidden">
+                <i class="fas fa-exclamation-triangle text-yellow-600 text-3xl mb-3"></i>
+                <p class="text-gray-600 font-medium">Aucun rondier en poste</p>
+                <button onclick="rechargerAgentsRondier()" class="btn btn-secondary mt-4"><i class="fas fa-sync-alt"></i> Actualiser</button>
+            </div>
+            <div class="pt-4 border-t border-gray-200">
+                <button onclick="afficherLoginPrincipal()" class="btn btn-secondary w-full justify-center">
+                    <i class="fas fa-desktop"></i> Connexion PC Sécurité
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" class="hidden">
+    <aside class="sidebar no-print" id="sidebar">
+        <div class="p-6 border-b border-gray-100 dark:border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 gradient-header rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-shield-alt text-white text-xl"></i>
+                </div>
+                <div>
+                    <div class="font-bold text-lg text-gray-800 dark:text-white">SSIAP Patrol</div>
+                    <div class="text-xs text-gray-500" id="userBadge"></div>
+                    <div class="text-xs" id="firebaseStatus"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="py-4 pb-48 overflow-y-auto" id="navMenu" style="max-height: calc(100vh - 120px);"></nav>
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-slate-700 space-y-2 bg-white dark:bg-slate-800" id="sidebarActions"></div>
+    </aside>
+
+    <header id="mobileHeader" class="lg:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-800 shadow-md z-40 p-4 flex items-center justify-between no-print">
+        <button onclick="toggleSidebar()" class="btn btn-icon btn-secondary"><i class="fas fa-bars"></i></button>
+        <div class="font-bold text-gray-800 dark:text-white">SSIAP Patrol</div>
+        <button onclick="logout()" class="btn btn-icon btn-secondary"><i class="fas fa-sign-out-alt"></i></button>
+    </header>
+
+    <header id="rondierHeader" class="lg:hidden fixed top-0 left-0 right-0 gradient-header text-white z-40 p-3 hidden no-print">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i class="fas fa-walking"></i></div>
+                <div>
+                    <div class="font-semibold text-sm" id="rondierHeaderName">Rondier</div>
+                    <div class="text-xs opacity-80">En service</div>
+                </div>
+            </div>
+            <button onclick="logout()" class="btn btn-sm bg-white/20 text-white border-0"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </header>
+
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <main class="main-content lg:ml-[280px] min-h-screen pt-20 lg:pt-0 pb-20 lg:pb-0">
+        <div class="p-6" id="mainContent"></div>
+    </main>
+
+    <nav id="mobileNavBar" class="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 z-50 hidden">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="navigate('rondes')" id="mobileNavRondes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500">
+                <i class="fas fa-route text-xl mb-1"></i><span class="text-xs font-medium">Rondes</span>
+            </button>
+            <button onclick="navigate('materiels')" id="mobileNavMateriels" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500">
+                <i class="fas fa-fire-extinguisher text-xl mb-1"></i><span class="text-xs font-medium">Matériels</span>
+            </button>
+            <button onclick="navigate('consignes')" id="mobileNavConsignes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500">
+                <i class="fas fa-file-alt text-xl mb-1"></i><span class="text-xs font-medium">Consignes</span>
+            </button>
+        </div>
+    </nav>
+</div>
+
+<div id="modalContainer"></div>
+
+<script>
+// ========== PARTIE 2 - DATABASE ET FIREBASE ==========
+// ========== DATABASE ==========
+const DB = {
+    agents: [
+        { id: 7, nom: 'Admin', prenom: 'Système', qualification: 'Administrateur', entreprise: 'SecuriPlus', actif: true, email: 'admin@securiplus.fr', telephone: '0600000000', codePin: '321518', dateDebutContrat: '2020-01-01', dateFinContrat: null },
+        { id: 1, nom: 'Martin', prenom: 'Jean-Pierre', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'jp.martin@securiplus.fr', telephone: '0612345678', dateDiplome: '2020-05-15', dateRecyclage: '2023-05-15', dateDebutContrat: '2020-06-01', dateFinContrat: null, codePin: null },
+        { id: 2, nom: 'Dupont', prenom: 'Alain', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'a.dupont@securiplus.fr', telephone: '0623456789', dateDiplome: '2019-03-10', dateRecyclage: '2022-03-10', dateDebutContrat: '2019-04-01', dateFinContrat: null, codePin: null },
+        { id: 3, nom: 'Boyer', prenom: 'Michel', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'm.boyer@securiplus.fr', telephone: '0634567890', dateDiplome: '2018-11-20', dateRecyclage: '2021-11-20', dateDebutContrat: '2018-12-01', dateFinContrat: null, codePin: null },
+        { id: 4, nom: 'Dubois', prenom: 'Marie', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'm.dubois@securiplus.fr', telephone: '0645678901', dateDiplome: '2021-01-25', dateRecyclage: '2024-01-25', dateDebutContrat: '2021-02-01', dateFinContrat: null, codePin: null },
+        { id: 5, nom: 'Garcia', prenom: 'Pierre', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'p.garcia@securiplus.fr', telephone: '0656789012', dateDiplome: '2020-09-05', dateRecyclage: '2023-09-05', dateDebutContrat: '2020-10-01', dateFinContrat: null, codePin: null },
+        { id: 6, nom: 'Leroy', prenom: 'François', qualification: 'SSIAP 3', entreprise: 'SecuriPlus', actif: true, email: 'f.leroy@securiplus.fr', telephone: '0667890123', dateDiplome: '2017-07-12', dateRecyclage: '2023-07-12', dateDebutContrat: '2017-08-01', dateFinContrat: null, codePin: null }
+    ],
+    materiels: [
+        { id: 1, nom: 'Extincteur CO2 5kg - Hall', type: 'Extincteur', localisation: 'Bâtiment Principal > RDC > Hall d\'entrée', statut: 'Opérationnel', derniereMaint: '2025-01-15', prochaineMaint: '2026-01-15' },
+        { id: 2, nom: 'RIA DN25 - Couloir 2ème', type: 'RIA', localisation: 'Bâtiment Principal > 2ème étage > Couloir R+2', statut: 'Opérationnel', derniereMaint: '2025-02-01', prochaineMaint: '2026-02-01' },
+        { id: 3, nom: 'Détecteur Optique B05', type: 'Détecteur', localisation: 'Bâtiment Principal > 2ème étage > Bureaux 201-210', statut: 'À vérifier', derniereMaint: '2024-12-01', prochaineMaint: '2025-06-01' },
+        { id: 4, nom: 'PCF Escalier A', type: 'Porte CF', localisation: 'Bâtiment Principal > RDC > Couloir principal', statut: 'Opérationnel', derniereMaint: '2025-03-01', prochaineMaint: '2025-09-01' },
+        { id: 5, nom: 'Extincteur Eau 6L - Cuisine', type: 'Extincteur', localisation: 'Bâtiment Annexe > 1er étage > Réfectoire', statut: 'En maintenance', derniereMaint: '2025-01-10', prochaineMaint: '2026-01-10' }
+    ],
+    prisesPoste: [],
+    rondes: [],
+    evenements: [],
+    mainCourante: [],
+    consignes: [
+        { id: 1, titre: 'Visite commission de sécurité', niveau: 'Particulière', destinataire: 'Tout le monde', priorite: 'Haute', contenu: 'Commission de sécurité prévue le 15 octobre 2025.', dateDebut: '2025-07-01', dateFin: '2025-10-15', active: true },
+        { id: 2, titre: 'Contrôle accès livraisons', niveau: 'Courante', destinataire: 'Chef de poste', priorite: 'Normale', contenu: 'Vérifier systématiquement les bons de livraison.', dateDebut: '2025-01-01', dateFin: null, active: true }
+    ]
+};
+
+let currentUser = null;
+let currentView = 'dashboard';
+let modalConfirmCallback = null;
+
+// ========== CONFIGURATION ÉTABLISSEMENT ==========
+let configEtablissement = {
+    nom: "Établissement",
+    batiments: [
+        {
+            id: 'bat1',
+            nom: 'Bâtiment Principal',
+            secteurs: [
+                { id: 'bat1-ss', nom: 'Sous-sol', zones: ['Parking souterrain', 'Local technique', 'Chaufferie', 'Archives'] },
+                { id: 'bat1-rdc', nom: 'RDC', zones: ['Hall d\'entrée', 'Accueil', 'Salle de réunion A', 'Sanitaires RDC', 'Couloir principal'] },
+                { id: 'bat1-r1', nom: '1er étage', zones: ['Bureaux 101-110', 'Salle de pause', 'Sanitaires R+1', 'Couloir R+1'] },
+                { id: 'bat1-r2', nom: '2ème étage', zones: ['Bureaux 201-210', 'Salle de réunion B', 'Sanitaires R+2', 'Couloir R+2'] }
+            ]
+        },
+        {
+            id: 'bat2',
+            nom: 'Bâtiment Annexe',
+            secteurs: [
+                { id: 'bat2-rdc', nom: 'RDC', zones: ['Entrepôt', 'Quai de livraison', 'Bureau logistique'] },
+                { id: 'bat2-r1', nom: '1er étage', zones: ['Atelier', 'Vestiaires', 'Réfectoire'] }
+            ]
+        },
+        {
+            id: 'bat3',
+            nom: 'Extérieurs',
+            secteurs: [
+                { id: 'bat3-ext', nom: 'Zones extérieures', zones: ['Parking visiteurs', 'Parking personnel', 'Voie pompiers', 'Espaces verts'] }
+            ]
+        }
+    ]
+};
+
+let typesRondes = ['Ouverture', 'Fermeture', 'Vérification moyens de secours', 'Vérification dégagements', 'Surveillance travaux', 'Ronde de sécurité', 'Ronde technique', 'Ronde incendie'];
+
+// ========== FIREBASE ==========
+const firebaseConfig = {
+    apiKey: "AIzaSyBXK-4-9HBcTKCPQBdRzDSwTc55vRXWNOk",
+    authDomain: "ssiap-patrol.firebaseapp.com",
+    projectId: "ssiap-patrol",
+    storageBucket: "ssiap-patrol.firebasestorage.app",
+    messagingSenderId: "582750096370",
+    appId: "1:582750096370:web:025f700bc1bf9194afb96b",
+    measurementId: "G-3VW3N2LK4G"
+};
+
+let firebaseApp = null;
+let db = null;
+let firestoreEnabled = false;
+let donneesChargees = false;
+
+try {
+    if (typeof firebase !== 'undefined') {
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        firestoreEnabled = true;
+        console.log('Firebase initialisé');
+        updateFirebaseStatus(true);
+    }
+} catch (e) {
+    console.log('Firebase non disponible:', e);
+    firestoreEnabled = false;
+    updateFirebaseStatus(false);
+}
+
+function updateFirebaseStatus(connected) {
+    setTimeout(() => {
+        const el = document.getElementById('firebaseStatus');
+        if (el) {
+            el.innerHTML = connected ? 
+                '<span class="text-green-600"><i class="fas fa-cloud"></i> Connecté</span>' : 
+                '<span class="text-red-600"><i class="fas fa-cloud-slash"></i> Hors ligne</span>';
+        }
+    }, 100);
+}
+
+function sauvegarderVersFirebase() {
+    if (!firestoreEnabled || !db || !donneesChargees) return;
+
+    const saveData = {
+        version: '1.0',
+        date: new Date().toISOString(),
+        agents: DB.agents,
+        materiels: DB.materiels,
+        prisesPoste: DB.prisesPoste,
+        rondes: DB.rondes,
+        evenements: DB.evenements,
+        mainCourante: DB.mainCourante,
+        consignes: DB.consignes,
+        configEtablissement: configEtablissement,
+        typesRondes: typesRondes
+    };
+
+    db.collection('ssiap-patrol').doc('data').set(saveData)
+        .then(() => console.log('✅ Sauvegardé'))
+        .catch(err => console.error('Erreur sauvegarde:', err));
+}
+
+function chargerDepuisFirebase(callback) {
+    if (!firestoreEnabled || !db) {
+        donneesChargees = true;
+        if (callback) callback();
+        return;
+    }
+
+    db.collection('ssiap-patrol').doc('data').get()
+        .then(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                DB.agents = data.agents || DB.agents;
+                DB.materiels = data.materiels || DB.materiels;
+                DB.prisesPoste = data.prisesPoste || [];
+                DB.rondes = data.rondes || [];
+                DB.evenements = data.evenements || [];
+                DB.mainCourante = data.mainCourante || [];
+                DB.consignes = data.consignes || DB.consignes;
+                if (data.configEtablissement) configEtablissement = data.configEtablissement;
+                if (data.typesRondes) typesRondes = data.typesRondes;
+                console.log('✅ Données chargées');
+            }
+            donneesChargees = true;
+            if (callback) callback();
+        })
+        .catch(err => {
+            console.error('Erreur chargement:', err);
+            donneesChargees = true;
+            if (callback) callback();
+        });
+}
+
+function activerSyncTempsReel() {
+    if (!firestoreEnabled || !db) return;
+
+    db.collection('ssiap-patrol').doc('data').onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            DB.agents = data.agents || DB.agents;
+            DB.materiels = data.materiels || DB.materiels;
+            DB.prisesPoste = data.prisesPoste || [];
+            DB.rondes = data.rondes || [];
+            DB.evenements = data.evenements || [];
+            DB.mainCourante = data.mainCourante || [];
+            DB.consignes = data.consignes || DB.consignes;
+            if (data.configEtablissement) configEtablissement = data.configEtablissement;
+            if (data.typesRondes) typesRondes = data.typesRondes;
+
+            if (currentUser && currentView) {
+                const c = document.getElementById('mainContent');
+                if (c && views[currentView]) {
+                    c.innerHTML = '<div class="fade-in">' + views[currentView]() + '</div>';
+                }
+            }
+        }
+    });
+}
+
+function rafraichirDonnees() {
+    showToast('🔄 Synchronisation...', 'info');
+    chargerDepuisFirebase(() => {
+        showToast('✅ Données synchronisées !');
+        if (currentView) navigate(currentView);
+    });
+}
+
+// ========== DARK MODE ==========
+if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.classList.add('dark');
+}
+
+// ========== UTILITIES ==========
+const formatDate = d => d ? new Date(d).toLocaleDateString('fr-FR') : '-';
+const formatTime = d => d ? new Date(d).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : '-';
+const formatDateTime = d => d ? `${formatDate(d)} ${formatTime(d)}` : '-';
+const genId = () => Date.now() + Math.random();
+
+function getAgentsEnPoste() {
+    return DB.prisesPoste.filter(p => !p.finPoste).map(p => {
+        const agent = DB.agents.find(a => a.id === p.agentId);
+        return agent ? { ...agent, prisePosteId: p.id, poste: p.poste, heureDebut: p.heureDebut } : null;
+    }).filter(Boolean);
+}
+
+function getChefDePoste() {
+    return getAgentsEnPoste().find(a => a.poste === 'Chef de poste');
+}
+
+function addMainCourante(type, description, agentId, extra = {}) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    DB.mainCourante.unshift({
+        id: genId(), date: new Date().toISOString(), type, description,
+        agent: agent ? `${agent.prenom} ${agent.nom}` : 'Système', agentId, ...extra
+    });
+    sauvegarderVersFirebase();
+}
+
+function getStatusColor(statut) {
+    if (statut === 'Début' || statut === 'Alerte') return 'red';
+    if (statut === 'En cours') return 'orange';
+    if (statut === 'Terminé') return 'green';
+    return 'red';
+}
+
+// ========== FONCTIONS COULEURS RONDES ==========
+function getStatutCouleurRonde(ronde) {
+    if (!ronde.anomalies || ronde.anomalies.length === 0) return 'green';
+    const hasHorsService = ronde.anomalies.some(a => a.horsService === true);
+    if (hasHorsService) return 'red';
+    return 'orange';
+}
+
+function getStatutCouleurPoint(ronde, point) {
+    if (!point.valide) return 'gray';
+    const anomalie = ronde.anomalies?.find(a => a.pointId === point.id);
+    if (!anomalie) return 'green';
+    if (anomalie.horsService) return 'red';
+    return 'orange';
+}
+
+function getBadgeClassFromCouleur(couleur) {
+    switch(couleur) {
+        case 'green': return 'badge-success';
+        case 'orange': return 'badge-warning';
+        case 'red': return 'badge-danger';
+        default: return 'badge-secondary';
+    }
+}
+
+function getBgClassFromCouleur(couleur) {
+    switch(couleur) {
+        case 'green': return 'bg-green-50 dark:bg-green-900/30';
+        case 'orange': return 'bg-orange-50 dark:bg-orange-900/30';
+        case 'red': return 'bg-red-50 dark:bg-red-900/30';
+        default: return 'bg-gray-50 dark:bg-gray-700';
+    }
+}
+
+function getIconClassFromCouleur(couleur) {
+    switch(couleur) {
+        case 'green': return 'fa-check-circle text-green-500';
+        case 'orange': return 'fa-exclamation-triangle text-orange-500';
+        case 'red': return 'fa-ban text-red-500';
+        default: return 'fa-circle text-gray-400';
+    }
+}
+
+function verifierRecyclages() {
+    const maintenant = new Date();
+    const troixAnsEnMs = 3 * 365 * 24 * 60 * 60 * 1000;
+    let modifie = false;
+
+    DB.agents.forEach(agent => {
+        if (agent.dateRecyclage) {
+            const dateRecyclage = new Date(agent.dateRecyclage);
+            if ((maintenant - dateRecyclage) > troixAnsEnMs && agent.actif) {
+                agent.actif = false;
+                modifie = true;
+            }
+        }
+    });
+
+    if (modifie) sauvegarderVersFirebase();
+}
+
+// ========== LOGIN ==========
+function togglePasswordVisibility() {
+    const input = document.getElementById('loginPassword');
+    const icon = document.getElementById('eyeIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+function initLogin() {
+    const sel = document.getElementById('loginAgent');
+    const agentsTries = [...DB.agents.filter(a => a.actif)].sort((a, b) => {
+        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
+        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
+    });
+    sel.innerHTML = '<option value="">Sélectionner un agent...</option>' +
+        agentsTries.map(a => `<option value="${a.id}">${a.prenom} ${a.nom} - ${a.qualification}</option>`).join('');
+}
+
+function genererCodePin(dateDebutContrat) {
+    if (!dateDebutContrat) return '0000';
+    const d = new Date(dateDebutContrat);
+    const base = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    return ((base * 9301 + 49297) % 10000).toString().padStart(4, '0');
+}
+
+function obtenirCodePin(agent) {
+    if (agent.qualification === 'Administrateur') return agent.codePin || '321518';
+    return genererCodePin(agent.dateDebutContrat);
+}
+
+function login() {
+    const agentIdStr = document.getElementById('loginAgent').value;
+    const pwd = document.getElementById('loginPassword').value;
+
+    if (!agentIdStr) return showLoginError('Sélectionnez un agent');
+
+    const agent = DB.agents.find(a => String(a.id) === String(agentIdStr));
+    if (!agent) return showLoginError('Agent non trouvé');
+
+    if (pwd !== obtenirCodePin(agent)) return showLoginError('Code PIN incorrect');
+
+    currentUser = { ...agent };
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
+
+    chargerDepuisFirebase(() => initApp());
+}
+
+function showLoginError(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+function logout() {
+    currentUser = null;
+    document.getElementById('mainApp').classList.add('hidden');
+
+    if (detecterModeRondier()) {
+        afficherLoginRondier(true);
+    } else {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('loginRondier').classList.add('hidden');
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginError').classList.add('hidden');
+    }
+}
+
+// ========== LOGIN RONDIER ==========
+function detecterModeRondier() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('mode') === 'rondier';
+}
+
+function accederModeRondier() {
+    afficherLoginRondier(true);
+}
+
+function afficherLoginRondier(forceReload = false) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('loginRondier').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+
+    if (forceReload) {
+        document.getElementById('rondierLoading').classList.remove('hidden');
+        document.getElementById('rondierContent').classList.add('hidden');
+        chargerDepuisFirebase(() => afficherAgentsRondier());
+    } else {
+        document.getElementById('rondierLoading').classList.add('hidden');
+        document.getElementById('rondierContent').classList.remove('hidden');
+        afficherAgentsRondier();
+    }
+}
+
+function afficherAgentsRondier() {
+    document.getElementById('rondierLoading').classList.add('hidden');
+    document.getElementById('rondierContent').classList.remove('hidden');
+
+    const agentsEnPoste = getAgentsEnPoste().filter(a => a.qualification === 'SSIAP 1');
+    const listContainer = document.getElementById('rondierAgentsList');
+    const noAgentContainer = document.getElementById('rondierNoAgent');
+
+    if (agentsEnPoste.length === 0) {
+        listContainer.innerHTML = '';
+        noAgentContainer.classList.remove('hidden');
+    } else {
+        noAgentContainer.classList.add('hidden');
+        listContainer.innerHTML = agentsEnPoste.map(a => `
+            <button onclick="loginRondier(${a.id})" class="w-full p-4 bg-gray-50 dark:bg-slate-700 hover:bg-primary-50 rounded-xl flex items-center gap-4 transition-all border-2 border-transparent hover:border-primary-500">
+                <div class="w-12 h-12 gradient-header rounded-full flex items-center justify-center text-white font-bold text-lg">${a.prenom.charAt(0)}${a.nom.charAt(0)}</div>
+                <div class="flex-1 text-left">
+                    <div class="font-semibold text-gray-800 dark:text-white">${a.prenom} ${a.nom}</div>
+                    <div class="text-sm text-gray-500">En poste depuis ${formatTime(a.heureDebut)}</div>
+                </div>
+                <i class="fas fa-chevron-right text-gray-400"></i>
+            </button>
+        `).join('');
+    }
+}
+
+function rechargerAgentsRondier() {
+    showToast('🔄 Actualisation...', 'info');
+    afficherLoginRondier(true);
+}
+
+function loginRondier(agentId) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    if (!agent) return showToast('Agent non trouvé', 'error');
+
+    const prisePoste = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (!prisePoste) {
+        showToast('Agent plus en poste', 'error');
+        return rechargerAgentsRondier();
+    }
+
+    currentUser = { ...agent };
+    document.getElementById('loginRondier').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
+
+    initApp();
+    showToast(`Bienvenue ${currentUser.prenom} !`);
+}
+
+function afficherLoginPrincipal() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mode');
+    window.history.replaceState({}, document.title, url.toString());
+
+    document.getElementById('loginRondier').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+    initLogin();
+}
+// ========== NAVIGATION ==========
+const menuItems = [
+    { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', ssiap1: false, ssiap2: true, ssiap3: false, admin: false },
+    { id: 'verifications', icon: 'fa-clipboard-check', label: 'Vérifications', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'rondes', icon: 'fa-route', label: 'Rondes', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', ssiap1: false, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'materiels', icon: 'fa-fire-extinguisher', label: 'Matériels', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'consignes', icon: 'fa-file-alt', label: 'Consignes', ssiap1: true, ssiap2: true, ssiap3: true, admin: true },
+    { id: 'agents', icon: 'fa-users', label: 'Agents', ssiap1: false, ssiap2: false, ssiap3: true, admin: true },
+    { id: 'administration', icon: 'fa-cogs', label: 'Administration', ssiap1: false, ssiap2: false, ssiap3: true, admin: true }
+];
+
+function initApp() {
+    renderNav();
+    renderSidebarActions();
+    updateMobileNav();
+    const defaultView = currentUser?.qualification === 'SSIAP 1' ? 'rondes' : 'dashboard';
+    navigate(defaultView);
+}
+
+function renderSidebarActions() {
+    const qual = currentUser?.qualification;
+    let html = '';
+
+    if (qual === 'Administrateur') {
+        html += `
+            <button onclick="sauvegarderVersFirebase(); sauvegarderDonnees();" class="btn btn-success w-full justify-center btn-sm">
+                <i class="fas fa-cloud-upload-alt"></i> Sauvegarder
+            </button>
+            <button onclick="chargerDonnees()" class="btn btn-secondary w-full justify-center btn-sm">
+                <i class="fas fa-upload"></i> Charger fichier
+            </button>
+        `;
+    }
+
+    html += `<button onclick="logout()" class="btn btn-secondary w-full justify-center"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>`;
+    document.getElementById('sidebarActions').innerHTML = html;
+}
+
+function renderNav() {
+    const qual = currentUser?.qualification;
+    document.getElementById('navMenu').innerHTML = menuItems
+        .filter(m => {
+            if (qual === 'Administrateur') return m.admin;
+            if (qual === 'SSIAP 3') return m.ssiap3;
+            if (qual === 'SSIAP 2') return m.ssiap2;
+            if (qual === 'SSIAP 1') return m.ssiap1;
+            return false;
+        })
+        .map(m => `
+            <div class="nav-link ${currentView === m.id ? 'active' : ''}" onclick="navigate('${m.id}')">
+                <i class="fas ${m.icon} w-5"></i><span>${m.label}</span>
+            </div>
+        `).join('');
+}
+
+function navigate(view) {
+    currentView = view;
+    renderNav();
+    updateMobileNav();
+    const c = document.getElementById('mainContent');
+    c.innerHTML = '<div class="fade-in">' + (views[view]?.() || '') + '</div>';
+
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar?.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        overlay?.classList.add('hidden');
+    }
+
+    if (view === 'dashboard') {
+        setTimeout(() => {
+            const qrDiv = document.getElementById('qrCodeAccess');
+            if (qrDiv && typeof QRCode !== 'undefined') {
+                qrDiv.innerHTML = '';
+                const rondierUrl = window.location.href.split('?')[0] + '?mode=rondier';
+                new QRCode(qrDiv, { text: rondierUrl, width: 120, height: 120 });
+            }
+        }, 100);
+    }
+
+    if (view === 'administration' && adminTab === 'qrcodes') {
+        setTimeout(genererQRCodesAdmin, 100);
+    }
+}
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('hidden');
+}
+
+function updateMobileNav() {
+    const mobileNav = document.getElementById('mobileNavBar');
+    const mobileHeader = document.getElementById('mobileHeader');
+    const rondierHeader = document.getElementById('rondierHeader');
+    const rondierName = document.getElementById('rondierHeaderName');
+
+    if (currentUser?.qualification === 'SSIAP 1') {
+        mobileNav?.classList.remove('hidden');
+        mobileHeader?.classList.add('hidden');
+        rondierHeader?.classList.remove('hidden');
+        if (rondierName) rondierName.textContent = `${currentUser.prenom} ${currentUser.nom}`;
+
+        ['rondes', 'materiels', 'consignes'].forEach(id => {
+            const btn = document.getElementById('mobileNav' + id.charAt(0).toUpperCase() + id.slice(1));
+            if (btn) btn.classList.toggle('active', currentView === id);
+        });
+    } else {
+        mobileNav?.classList.add('hidden');
+        mobileHeader?.classList.remove('hidden');
+        rondierHeader?.classList.add('hidden');
+    }
+}
+
+// ========== VIEWS ==========
+const views = {
+    dashboard: renderDashboard,
+    prisePoste: renderPrisePoste,
+    verifications: renderVerifications,
+    rondes: renderRondes,
+    mainCourante: renderMainCourante,
+    evenements: renderEvenements,
+    materiels: renderMateriels,
+    consignes: renderConsignes,
+    agents: renderAgents,
+    administration: renderAdministration
+};
+
+// ========== DASHBOARD ==========
+function renderDashboard() {
+    const agentsPoste = getAgentsEnPoste();
+    const chef = getChefDePoste();
+    const rondesEnCours = DB.rondes.filter(r => !r.heureFin);
+    const evtsEnCours = DB.evenements.filter(e => e.statut !== 'Terminé');
+    const todayEvents = DB.mainCourante.filter(m => new Date(m.date).toDateString() === new Date().toDateString());
+
+    return `
+        <div class="gradient-header text-white p-6 rounded-2xl mb-6 shadow-lg flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold">Tableau de bord SSIAP</h1>
+                <p class="opacity-90">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            <div class="bg-white p-3 rounded-xl no-print">
+                <div id="qrCodeAccess"></div>
+                <p class="text-center text-xs text-gray-600 mt-2"><i class="fas fa-mobile-alt mr-1"></i>Accès Rondier Mobile</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="icon bg-green-100 text-green-600"><i class="fas fa-users"></i></div>
+                <div class="value text-gray-800 dark:text-white">${agentsPoste.length}</div>
+                <div class="label">Agents en poste</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="icon bg-blue-100 text-blue-600"><i class="fas fa-route"></i></div>
+                <div class="value text-gray-800 dark:text-white">${rondesEnCours.length}</div>
+                <div class="label">Rondes en cours</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="icon bg-red-100 text-red-600"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="value text-gray-800 dark:text-white">${evtsEnCours.length}</div>
+                <div class="label">Événements actifs</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="icon bg-purple-100 text-purple-600"><i class="fas fa-clipboard-list"></i></div>
+                <div class="value text-gray-800 dark:text-white">${todayEvents.length}</div>
+                <div class="label">Actions aujourd'hui</div>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+            <div class="card">
+                <div class="gradient-success text-white p-4 font-semibold rounded-t-2xl"><i class="fas fa-users mr-2"></i>Équipe en poste</div>
+                <div class="p-4">
+                    ${chef ? `
+                        <div class="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-xl mb-3">
+                            <div class="w-10 h-10 bg-yellow-500 rounded-xl flex items-center justify-center text-white"><i class="fas fa-crown"></i></div>
+                            <div>
+                                <div class="font-semibold">Chef de Poste</div>
+                                <div class="text-sm text-gray-600">${chef.prenom} ${chef.nom} • depuis ${formatTime(chef.heureDebut)}</div>
+                            </div>
+                        </div>
+                    ` : '<p class="text-gray-500 text-center py-2">Aucun chef de poste</p>'}
+                    ${agentsPoste.filter(a => a.poste !== 'Chef de poste').map(a => `
+                        <div class="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl">
+                            <div class="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center text-white font-semibold">${a.prenom[0]}${a.nom[0]}</div>
+                            <div>
+                                <div class="font-medium">${a.prenom} ${a.nom}</div>
+                                <div class="text-sm text-gray-500">${a.qualification} • depuis ${formatTime(a.heureDebut)}</div>
+                            </div>
+                        </div>
+                    `).join('') || ''}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="gradient-warning text-white p-4 font-semibold rounded-t-2xl"><i class="fas fa-file-alt mr-2"></i>Consignes actives</div>
+                <div class="p-4 space-y-3">
+                    ${DB.consignes.filter(c => c.active).slice(0, 5).map(c => `
+                        <div class="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl">
+                            <i class="fas fa-file-alt text-purple-500"></i>
+                            <div class="flex-1">
+                                <div class="badge badge-${c.niveau === 'Particulière' ? 'warning' : 'info'} mb-1">${c.niveau}</div>
+                                <div class="font-medium">${c.titre}</div>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-gray-500 text-center py-4">Aucune consigne</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ========== PRISE DE POSTE ==========
+function renderPrisePoste() {
+    const agentsPoste = getAgentsEnPoste();
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-user-clock mr-2 text-primary-500"></i>Prise de Poste</h1>
+            <button onclick="showModalPrisePoste()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle prise de poste</button>
+        </div>
+
+        <div class="card">
+            <div class="gradient-success text-white p-4 font-semibold">Agents en poste (${agentsPoste.length})</div>
+            <div class="p-4">
+                ${agentsPoste.length ? `
+                    <table class="table">
+                        <thead><tr><th>Agent</th><th>Qualification</th><th>Poste</th><th>Début</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${agentsPoste.map(a => `
+                                <tr>
+                                    <td class="font-medium">${a.prenom} ${a.nom}</td>
+                                    <td><span class="badge badge-info">${a.qualification}</span></td>
+                                    <td><span class="badge ${a.poste === 'Chef de poste' ? 'badge-warning' : 'badge-success'}">${a.poste}</span></td>
+                                    <td>${formatDateTime(a.heureDebut)}</td>
+                                    <td><button onclick="finPoste(${a.prisePosteId})" class="btn btn-danger btn-sm"><i class="fas fa-stop"></i> Fin</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                ` : '<p class="text-gray-500 text-center py-8">Aucun agent en poste</p>'}
+            </div>
+        </div>
+    `;
+}
+
+function showModalPrisePoste() {
+    showModal('Nouvelle Prise de Poste', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Niveau SSIAP</label>
+                <select id="ppNiveau" class="input" onchange="updateAgentsList()">
+                    <option value="">Sélectionner...</option>
+                    <option value="SSIAP 1">SSIAP 1</option>
+                    <option value="SSIAP 2">SSIAP 2</option>
+                    <option value="SSIAP 3">SSIAP 3</option>
+                </select>
+            </div>
+            <div id="agentSection" style="display: none;">
+                <label class="block text-sm font-semibold mb-2">Agent</label>
+                <select id="ppAgent" class="input" size="5" style="height: 120px;"></select>
+            </div>
+            <div id="posteSection" style="display: none;">
+                <label class="block text-sm font-semibold mb-2">Poste</label>
+                <select id="ppPoste" class="input"></select>
+            </div>
+        </div>
+    `, () => {
+        const agentId = parseInt(document.getElementById('ppAgent').value);
+        if (!agentId) return showToast('Sélectionnez un agent', 'error');
+
+        const pp = {
+            id: genId(),
+            agentId,
+            poste: document.getElementById('ppPoste').value,
+            heureDebut: new Date().toISOString(),
+            finPoste: null,
+            verificationsEffectuees: false
+        };
+        DB.prisesPoste.push(pp);
+
+        const agent = DB.agents.find(a => a.id === agentId);
+        addMainCourante('Prise de Poste', `${pp.poste} - ${agent.prenom} ${agent.nom}`, agentId);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Prise de poste enregistrée');
+        navigate('verifications');
+    });
+}
+
+function updateAgentsList() {
+    const niveau = document.getElementById('ppNiveau').value;
+    const agentSection = document.getElementById('agentSection');
+    const posteSection = document.getElementById('posteSection');
+    const agentSelect = document.getElementById('ppAgent');
+    const posteSelect = document.getElementById('ppPoste');
+
+    if (!niveau) {
+        agentSection.style.display = 'none';
+        posteSection.style.display = 'none';
+        return;
+    }
+
+    const agentsActifs = DB.agents.filter(a => a.actif && a.qualification === niveau);
+    const agentsEnPoste = getAgentsEnPoste().map(a => a.id);
+    const agentsDisponibles = agentsActifs.filter(a => !agentsEnPoste.includes(a.id));
+
+    agentSelect.innerHTML = agentsDisponibles.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('');
+
+    const hasChef = getChefDePoste();
+    let postesOptions = '';
+
+    if (niveau === 'SSIAP 1') {
+        postesOptions = '<option value="Équipier">Équipier</option>';
+    } else {
+        if (!hasChef) postesOptions += '<option value="Chef de poste">Chef de poste</option>';
+        postesOptions += '<option value="Chef d\'Équipe">Chef d\'Équipe</option>';
+    }
+
+    posteSelect.innerHTML = postesOptions;
+    agentSection.style.display = agentsDisponibles.length ? 'block' : 'none';
+    posteSection.style.display = agentsDisponibles.length ? 'block' : 'none';
+}
+
+function finPoste(id) {
+    showConfirm('Confirmer la fin de poste ?', () => {
+        const pp = DB.prisesPoste.find(p => p.id === id);
+        if (pp) {
+            pp.finPoste = new Date().toISOString();
+            const agent = DB.agents.find(a => a.id === pp.agentId);
+            addMainCourante('Fin de Poste', `${agent.prenom} ${agent.nom}`, pp.agentId);
+            sauvegarderVersFirebase();
+            showToast('Fin de poste enregistrée');
+            navigate('prisePoste');
+        }
+    });
+}
+
+// ========== VERIFICATIONS ==========
+const VERIFICATIONS_CONFIG = {
+    'Chef de poste': {
+        securite: ['Test de signalisation', 'Bilan SSI', 'Éclairage de sécurité PC', 'Moyens de secours PC'],
+        techniques: ['Test de ligne directe', 'Test TU', 'Test radio', 'Report alarme technique', 'PTI'],
+        administratives: ['Registre de sécurité', 'Consignes particulières', 'Consignes générales', 'Registre des clés']
+    },
+    "Chef d'Équipe": {
+        securite: [],
+        techniques: ['Test radio', 'PTI', 'Lampe torche', 'Trousseau de clés'],
+        administratives: ['Consignes particulières', 'Consignes générales']
+    },
+    "Équipier": {
+        securite: [],
+        techniques: ['Test radio', 'PTI', 'Lampe torche', 'Trousseau de clés'],
+        administratives: ['Consignes particulières', 'Consignes générales']
+    }
+};
+
+function renderVerifications() {
+    const agentsEnPoste = getAgentsEnPoste();
+    const agentsSansVerif = agentsEnPoste.filter(a => {
+        const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
+        return pp && !pp.verificationsEffectuees;
+    });
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-clipboard-check mr-2 text-primary-500"></i>Vérifications</h1>
+        </div>
+
+        ${agentsEnPoste.length === 0 ? `
+            <div class="card p-8 text-center">
+                <i class="fas fa-user text-4xl text-gray-300 mb-4"></i>
+                <h2 class="text-xl font-bold mb-2">Aucun agent en poste</h2>
+                <button onclick="navigate('prisePoste')" class="btn btn-primary mt-4"><i class="fas fa-user-clock"></i> Aller à Prise de Poste</button>
+            </div>
+        ` : `
+            ${agentsSansVerif.length > 0 ? `
+                <div class="mb-6">
+                    <h2 class="text-lg font-semibold mb-3"><i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>À effectuer (${agentsSansVerif.length})</h2>
+                    <div class="grid gap-4">
+                        ${agentsSansVerif.map(agent => {
+                            const pp = DB.prisesPoste.find(p => p.agentId === agent.id && !p.finPoste);
+                            return `
+                                <div class="card">
+                                    <div class="gradient-warning text-white p-4 font-semibold flex items-center justify-between rounded-t-2xl">
+                                        <span><i class="fas fa-user mr-2"></i>${agent.prenom} ${agent.nom}</span>
+                                        <span class="badge bg-white/20 text-white">${pp?.poste || 'Agent'}</span>
+                                    </div>
+                                    <div class="p-4">
+                                        <button onclick="ouvrirVerificationsAgent(${agent.id})" class="btn btn-primary w-full">
+                                            <i class="fas fa-clipboard-check"></i> Effectuer les vérifications
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            ` : `
+                <div class="card p-8 text-center">
+                    <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
+                    <h2 class="text-xl font-bold text-green-600">Toutes les vérifications sont terminées !</h2>
+                </div>
+            `}
+        `}
+    `;
+}
+
+function ouvrirVerificationsAgent(agentId) {
+    const agent = DB.agents.find(a => a.id === agentId);
+    const pp = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+    if (!agent || !pp) return;
+
+    const config = VERIFICATIONS_CONFIG[pp.poste] || VERIFICATIONS_CONFIG["Équipier"];
+    const totalVerifs = config.securite.length + config.techniques.length + config.administratives.length;
+
+    let html = '<div class="space-y-6">';
+
+    if (config.securite.length > 0) {
+        html += `<div class="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-xl">
+            <div class="font-semibold mb-3 text-orange-700"><i class="fas fa-shield-alt mr-2"></i>Sécurité</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${config.securite.map(item => `
+                    <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer">
+                        <input type="checkbox" class="w-5 h-5 verif-check" data-category="securite"><span>${item}</span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>`;
+    }
+
+    if (config.techniques.length > 0) {
+        html += `<div class="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-xl">
+            <div class="font-semibold mb-3 text-yellow-700"><i class="fas fa-tools mr-2"></i>Techniques</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${config.techniques.map(item => `
+                    <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer">
+                        <input type="checkbox" class="w-5 h-5 verif-check" data-category="technique"><span>${item}</span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>`;
+    }
+
+    if (config.administratives.length > 0) {
+        html += `<div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
+            <div class="font-semibold mb-3 text-blue-700"><i class="fas fa-file-alt mr-2"></i>Administratives</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${config.administratives.map(item => `
+                    <label class="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg cursor-pointer">
+                        <input type="checkbox" class="w-5 h-5 verif-check" data-category="administrative"><span>${item}</span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>`;
+    }
+
+    html += `<div class="text-lg font-semibold text-gray-600"><span id="verifChecked">0</span> / ${totalVerifs} vérifications</div></div>`;
+
+    showModal(`Vérifications - ${agent.prenom} ${agent.nom}`, html, () => {
+        const checked = document.querySelectorAll('.verif-check:checked').length;
+        pp.verificationsEffectuees = checked === totalVerifs;
+        addMainCourante('Vérifications', `${pp.poste} - ${checked}/${totalVerifs} effectuées`, agentId);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast(pp.verificationsEffectuees ? '✅ Vérifications complètes !' : '⚠️ Vérifications incomplètes');
+        navigate('verifications');
+    }, 'Enregistrer');
+
+    setTimeout(() => {
+        document.querySelectorAll('.verif-check').forEach(cb => {
+            cb.addEventListener('change', () => {
+                document.getElementById('verifChecked').textContent = document.querySelectorAll('.verif-check:checked').length;
+            });
+        });
+    }, 100);
+}
+
+// ========== RONDES ==========
+const zonesRondes = ['Bâtiment Principal', 'Bâtiment Annexe', 'Extérieurs', 'Toutes zones'];
+let filtreRondeStatut = '';
+let filtreRondeZone = '';
+let filtreRondeType = '';
+
+const categoriesRondeSpecifique = [
+    { id: 'extincteurs', nom: 'Extincteurs', icon: 'fa-fire-extinguisher', types: ['Extincteur'] },
+    { id: 'ria', nom: 'RIA', icon: 'fa-tint', types: ['RIA'] },
+    { id: 'eclairage', nom: 'Éclairage sécurité', icon: 'fa-lightbulb', types: ['Éclairage', 'BAES'] },
+    { id: 'issues', nom: 'Issues de secours', icon: 'fa-door-open', types: ['Issue de secours', 'Porte'] },
+    { id: 'pcf', nom: 'Portes coupe-feu', icon: 'fa-door-closed', types: ['Porte CF', 'Clapet CF'] },
+    { id: 'detecteurs', nom: 'Détecteurs', icon: 'fa-bell', types: ['Détecteur', 'Déclencheur'] }
+];
+
+function renderRondes() {
+    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
+    const stats = {
+        total: DB.rondes.length,
+        enCours: DB.rondes.filter(r => !r.heureFin).length,
+        terminees: DB.rondes.filter(r => r.heureFin).length,
+        anomalies: DB.rondes.filter(r => r.anomalies?.length).length
+    };
+
+    const mesRondesEnCours = DB.rondes.filter(r => !r.heureFin && r.agentId === currentUser?.id);
+
+    if (isSsiap1) return renderRondesMobile(mesRondesEnCours, stats);
+
+    const rondesFiltrees = DB.rondes.filter(r => {
+        const matchStatut = !filtreRondeStatut || (filtreRondeStatut === 'En cours' && !r.heureFin) || (filtreRondeStatut === 'Terminée' && r.heureFin);
+        const matchZone = !filtreRondeZone || r.zone === filtreRondeZone;
+        const matchType = !filtreRondeType || r.type === filtreRondeType;
+        return matchStatut && matchZone && matchType;
+    });
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-route text-primary-500 mr-2"></i>Gestion des Rondes</h1>
+                <p class="text-gray-500 text-sm">${stats.total} ronde(s) • ${stats.enCours} en cours</p>
+            </div>
+            <button onclick="rafraichirDonnees()" class="btn btn-secondary btn-sm"><i class="fas fa-sync-alt"></i></button>
+        </div>
+
+        ${mesRondesEnCours.length ? `
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-xl p-4 mb-6">
+            <div class="font-bold text-yellow-700 mb-2"><i class="fas fa-walking mr-2"></i>Mes rondes en cours</div>
+            ${mesRondesEnCours.map(r => `
+                <div class="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-lg mb-2">
+                    <div>
+                        <div class="font-medium">${r.nom || r.type}</div>
+                        <div class="text-sm text-gray-500">${r.pointsControle?.filter(p => p.valide).length || 0}/${r.pointsControle?.length || 0} points</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="effectuerRonde(${r.id})" class="btn btn-warning btn-sm"><i class="fas fa-clipboard-check"></i></button>
+                        <button onclick="terminerRondeAvecDetails(${r.id})" class="btn btn-success btn-sm"><i class="fas fa-flag-checkered"></i></button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-blue-600">${stats.total}</div><div class="text-xs text-gray-500">Total</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-orange-600">${stats.enCours}</div><div class="text-xs text-gray-500">En cours</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-green-600">${stats.terminees}</div><div class="text-xs text-gray-500">Terminées</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-red-600">${stats.anomalies}</div><div class="text-xs text-gray-500">Avec anomalies</div></div>
+        </div>
+
+        <div class="card">
+            <div class="p-4 space-y-3">
+                ${rondesFiltrees.length ? rondesFiltrees.map(r => {
+                    const agent = DB.agents.find(a => a.id === r.agentId);
+                    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+                    const totalPoints = r.pointsControle?.length || 0;
+                    const progression = totalPoints > 0 ? Math.round((pointsValides / totalPoints) * 100) : 0;
+                    const couleurRonde = getStatutCouleurRonde(r);
+                    const hasAnomalies = r.anomalies?.length > 0;
+                    const hasHS = r.anomalies?.some(a => a.horsService);
+
+                    return `
+                        <div class="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl ${hasHS ? 'border-l-4 border-red-500' : hasAnomalies ? 'border-l-4 border-orange-500' : ''}">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span class="badge ${r.heureFin ? getBadgeClassFromCouleur(couleurRonde) : 'badge-warning'}">${r.heureFin ? 'Terminée' : 'En cours'}</span>
+                                    <span class="badge badge-info">${r.type}</span>
+                                    ${hasHS ? '<span class="badge badge-danger"><i class="fas fa-ban mr-1"></i>HS</span>' : ''}
+                                    ${hasAnomalies && !hasHS ? `<span class="badge badge-warning">${r.anomalies.length} anomalie(s)</span>` : ''}
+                                </div>
+                                <div class="font-medium text-gray-800 dark:text-white">${r.nom || r.type}</div>
+                                <div class="text-sm text-gray-500">${agent?.prenom || ''} ${agent?.nom || ''} • ${formatDateTime(r.heureDebut)}</div>
+                                ${totalPoints > 0 ? `
+                                <div class="mt-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 bg-gray-200 rounded-full h-2">
+                                            <div class="bg-${couleurRonde === 'red' ? 'red' : couleurRonde === 'orange' ? 'orange' : 'green'}-500 h-2 rounded-full" style="width: ${progression}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">${pointsValides}/${totalPoints}</span>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                ${!r.heureFin && r.agentId === currentUser?.id ? `
+                                    <button onclick="effectuerRonde(${r.id})" class="btn btn-warning btn-sm"><i class="fas fa-clipboard-check"></i></button>
+                                    <button onclick="terminerRondeAvecDetails(${r.id})" class="btn btn-${couleurRonde === 'red' ? 'danger' : couleurRonde === 'orange' ? 'warning' : 'success'} btn-sm"><i class="fas fa-flag-checkered"></i></button>
+                                ` : ''}
+                                <button onclick="voirRonde(${r.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                    `;
+                }).join('') : '<p class="text-gray-500 text-center py-8">Aucune ronde</p>'}
+            </div>
+        </div>
+    `;
+}
+
+function renderRondesMobile(mesRondesEnCours, stats) {
+    if (mesRondesEnCours.length > 0) {
+        const r = mesRondesEnCours[0];
+        const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+        const totalPoints = r.pointsControle?.length || 0;
+        const progression = totalPoints > 0 ? Math.round((pointsValides / totalPoints) * 100) : 0;
+
+        return `
+            <div class="space-y-4">
+                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-5 rounded-2xl shadow-lg">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+                            <i class="fas fa-walking text-2xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-lg">${r.nom || r.type}</div>
+                            <div class="text-sm opacity-90">${r.zone || 'Toutes zones'}</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/20 rounded-full h-4 mb-2">
+                        <div class="bg-white h-4 rounded-full" style="width: ${progression}%"></div>
+                    </div>
+                    <div class="text-sm text-center mb-4">${pointsValides}/${totalPoints} points validés</div>
+
+                    <button onclick="scannerPointControle(${r.id})" class="w-full bg-white text-orange-600 font-bold py-5 rounded-xl flex items-center justify-center gap-3 mb-3">
+                        <i class="fas fa-qrcode text-2xl"></i>
+                        <span class="text-lg">Scanner un point</span>
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="voirPointsRonde(${r.id})" class="bg-white/20 text-white font-bold py-3 rounded-xl">
+                            <i class="fas fa-list mr-2"></i>Voir points
+                        </button>
+                        <button onclick="terminerRondeAvecDetails(${r.id})" class="bg-white/20 text-white font-bold py-3 rounded-xl border-2 border-white/50">
+                            <i class="fas fa-flag-checkered mr-2"></i>Terminer
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="signalerAnomalieMobile(${r.id})" class="w-full card p-4 flex items-center gap-4 text-left">
+                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold">Signaler une anomalie</div>
+                        <div class="text-xs text-gray-500">Hors point de contrôle</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+            <button onclick="nouvelleRondeMobile()" class="w-full max-w-sm gradient-header text-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4">
+                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
+                    <i class="fas fa-play text-4xl"></i>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold">Nouvelle Ronde</div>
+                    <div class="text-sm opacity-80 mt-1">Appuyez pour commencer</div>
+                </div>
+            </button>
+
+            <div class="grid grid-cols-2 gap-4 w-full max-w-sm">
+                <div class="card p-4 text-center">
+                    <div class="text-3xl font-bold text-green-600">${stats.terminees}</div>
+                    <div class="text-xs text-gray-500">Terminées</div>
+                </div>
+                <div class="card p-4 text-center">
+                    <div class="text-3xl font-bold text-red-600">${stats.anomalies}</div>
+                    <div class="text-xs text-gray-500">Anomalies</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function nouvelleRondeMobile() {
+    const estEnPoste = DB.prisesPoste.find(p => p.agentId === currentUser?.id && !p.finPoste);
+    if (!estEnPoste) {
+        showModal('⚠️ Prise de poste requise', `
+            <div class="text-center space-y-4">
+                <i class="fas fa-desktop text-yellow-600 text-4xl"></i>
+                <p>Effectuez votre prise de poste au PC Sécurité avant de démarrer une ronde.</p>
+            </div>
+        `, null, 'Compris');
+        return;
+    }
+
+    showModal('Nouvelle Ronde', `
+        <div class="space-y-4">
+            <button onclick="closeModal(); choisirZoneRonde('global')" class="w-full p-5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-building text-2xl"></i></div>
+                <div class="text-left flex-1">
+                    <div class="font-bold text-lg">Ronde Globale</div>
+                    <div class="text-sm opacity-80">Par zone/secteur</div>
+                </div>
+            </button>
+            <button onclick="closeModal(); choisirCategorieRonde()" class="w-full p-5 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center"><i class="fas fa-fire-extinguisher text-2xl"></i></div>
+                <div class="text-left flex-1">
+                    <div class="font-bold text-lg">Ronde Spécifique</div>
+                    <div class="text-sm opacity-80">Par type de matériel</div>
+                </div>
+            </button>
+        </div>
+    `, null, 'Annuler');
+}
+
+function choisirZoneRonde(type) {
+    showModal('Choisir le niveau', `
+        <div class="space-y-3">
+            <button onclick="closeModal(); demarrerRondeGlobale('Établissement complet', null, null)" class="w-full p-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl flex items-center gap-3">
+                <i class="fas fa-building text-2xl"></i>
+                <div class="text-left flex-1">
+                    <div class="font-bold">Établissement complet</div>
+                    <div class="text-sm opacity-80">Tous les bâtiments</div>
+                </div>
+            </button>
+            <div class="border-t my-2"></div>
+            ${configEtablissement.batiments.map(bat => `
+                <button onclick="closeModal(); choisirSecteurRonde('${bat.id}')" class="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl flex items-center gap-3">
+                    <i class="fas fa-building text-blue-600"></i>
+                    <div class="flex-1 text-left">
+                        <div class="font-medium">${bat.nom}</div>
+                        <div class="text-xs text-gray-500">${bat.secteurs.length} secteur(s)</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </button>
+            `).join('')}
+        </div>
+    `, null, 'Retour');
+}
+
+function choisirSecteurRonde(batimentId) {
+    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+    if (!batiment) return;
+
+    showModal(batiment.nom, `
+        <div class="space-y-3">
+            <button onclick="closeModal(); demarrerRondeGlobale('${batiment.nom}', '${batimentId}', null)" class="w-full p-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl flex items-center gap-3">
+                <i class="fas fa-layer-group text-2xl"></i>
+                <div class="text-left flex-1">
+                    <div class="font-bold">Tout le bâtiment</div>
+                </div>
+            </button>
+            <div class="border-t my-2"></div>
+            ${batiment.secteurs.map(sect => `
+                <button onclick="closeModal(); choisirZoneSecteur('${batimentId}', '${sect.id}')" class="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl flex items-center gap-3">
+                    <i class="fas fa-layer-group text-green-600"></i>
+                    <div class="flex-1 text-left">
+                        <div class="font-medium">${sect.nom}</div>
+                        <div class="text-xs text-gray-500">${sect.zones.length} zone(s)</div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </button>
+            `).join('')}
+        </div>
+    `, null, 'Retour');
+}
+
+function choisirZoneSecteur(batimentId, secteurId) {
+    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+    const secteur = batiment?.secteurs.find(s => s.id === secteurId);
+    if (!secteur) return;
+
+    showModal(`${batiment.nom} > ${secteur.nom}`, `
+        <div class="space-y-3">
+            <button onclick="closeModal(); demarrerRondeGlobale('${batiment.nom} > ${secteur.nom}', '${batimentId}', '${secteurId}')" class="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl">
+                <div class="font-bold">Tout le secteur (${secteur.zones.length} zones)</div>
+            </button>
+            <div class="border-t my-2"></div>
+            <div class="max-h-60 overflow-y-auto space-y-2">
+                ${secteur.zones.map(zone => `
+                    <button onclick="closeModal(); demarrerRondeGlobale('${batiment.nom} > ${secteur.nom} > ${zone}', '${batimentId}', '${secteurId}', '${zone}')" class="w-full p-3 bg-gray-50 dark:bg-slate-700 rounded-xl flex items-center gap-3">
+                        <i class="fas fa-map-pin text-yellow-600"></i>
+                        <span class="font-medium text-sm">${zone}</span>
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    `, null, 'Retour');
+}
+
+function demarrerRondeGlobale(nom, batimentId = null, secteurId = null, zoneSpecifique = null) {
+    let pointsControle = [];
+
+    if (!batimentId) {
+        configEtablissement.batiments.forEach(bat => {
+            bat.secteurs.forEach(sect => {
+                sect.zones.forEach(zone => {
+                    pointsControle.push({
+                        id: genId(),
+                        nom: zone,
+                        chemin: `${bat.nom} > ${sect.nom} > ${zone}`,
+                        qrCode: `ZONE-${bat.id}-${sect.id}-${zone.replace(/\s+/g, '-').toUpperCase()}`.substring(0, 50),
+                        valide: false,
+                        heureValidation: null
+                    });
+                });
+            });
+        });
+    } else if (batimentId && !secteurId) {
+        const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+        batiment?.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                pointsControle.push({
+                    id: genId(),
+                    nom: zone,
+                    chemin: `${batiment.nom} > ${sect.nom} > ${zone}`,
+                    qrCode: `ZONE-${batimentId}-${sect.id}-${zone.replace(/\s+/g, '-').toUpperCase()}`.substring(0, 50),
+                    valide: false,
+                    heureValidation: null
+                });
+            });
+        });
+    } else if (secteurId && !zoneSpecifique) {
+        const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+        const secteur = batiment?.secteurs.find(s => s.id === secteurId);
+        secteur?.zones.forEach(zone => {
+            pointsControle.push({
+                id: genId(),
+                nom: zone,
+                chemin: `${batiment.nom} > ${secteur.nom} > ${zone}`,
+                qrCode: `ZONE-${batimentId}-${secteurId}-${zone.replace(/\s+/g, '-').toUpperCase()}`.substring(0, 50),
+                valide: false,
+                heureValidation: null
+            });
+        });
+    } else if (zoneSpecifique) {
+        pointsControle.push({
+            id: genId(),
+            nom: zoneSpecifique,
+            chemin: nom,
+            qrCode: `ZONE-${batimentId}-${secteurId}-${zoneSpecifique.replace(/\s+/g, '-').toUpperCase()}`.substring(0, 50),
+            valide: false,
+            heureValidation: null
+        });
+    }
+
+    if (pointsControle.length === 0) {
+        showToast('Aucun point de contrôle', 'error');
+        return;
+    }
+
+    const nouvelleRonde = {
+        id: genId(),
+        type: 'Ronde de sécurité',
+        nom: `Ronde ${nom}`,
+        zone: nom,
+        modeRonde: 'global',
+        agentId: currentUser?.id,
+        heureDebut: new Date().toISOString(),
+        heureFin: null,
+        pointsControle: pointsControle,
+        anomalies: []
+    };
+
+    DB.rondes.push(nouvelleRonde);
+    addMainCourante('Départ Ronde', `Ronde ${nom} - ${pointsControle.length} points`, currentUser?.id);
+    sauvegarderVersFirebase();
+    showToast(`🚀 Ronde démarrée ! ${pointsControle.length} points`);
+    navigate('rondes');
+}
+
+function choisirCategorieRonde() {
+    showModal('Choisir le type de matériel', `
+        <div class="space-y-2 max-h-96 overflow-y-auto">
+            ${categoriesRondeSpecifique.map(cat => {
+                const count = DB.materiels.filter(m => cat.types.some(t => m.type.includes(t))).length;
+                return `
+                <button onclick="closeModal(); demarrerRondeSpecifique('${cat.id}')" class="w-full p-4 bg-gray-50 dark:bg-slate-700 rounded-xl flex items-center gap-3 ${count === 0 ? 'opacity-50' : ''}">
+                    <i class="fas ${cat.icon} text-orange-600"></i>
+                    <div class="flex-1 text-left">
+                        <div class="font-medium">${cat.nom}</div>
+                        <div class="text-xs text-gray-500">${count} matériel(s)</div>
+                    </div>
+                </button>
+                `;
+            }).join('')}
+        </div>
+    `, null, 'Retour');
+}
+
+function demarrerRondeSpecifique(categorieId) {
+    const categorie = categoriesRondeSpecifique.find(c => c.id === categorieId);
+    if (!categorie) return;
+
+    const materiels = DB.materiels.filter(m => categorie.types.some(t => m.type.includes(t)));
+
+    if (materiels.length === 0) {
+        showToast('Aucun matériel trouvé', 'error');
+        return;
+    }
+
+    const pointsControle = materiels.map(m => ({
+        id: genId(),
+        nom: m.nom,
+        materielId: m.id,
+        localisation: m.localisation,
+        qrCode: m.codeQR || `MAT-${m.id}`,
+        valide: false,
+        heureValidation: null
+    }));
+
+    const ronde = {
+        id: genId(),
+        type: `Ronde ${categorie.nom}`,
+        nom: `${categorie.nom} - Établissement`,
+        zone: 'Établissement complet',
+        agentId: currentUser.id,
+        heureDebut: new Date().toISOString(),
+        heureFin: null,
+        pointsControle: pointsControle,
+        anomalies: [],
+        isSpecifique: true,
+        categorieId: categorieId
+    };
+
+    DB.rondes.push(ronde);
+    addMainCourante('Début ronde', `Ronde spécifique: ${categorie.nom}`, currentUser.id);
+    sauvegarderVersFirebase();
+    showToast(`🚀 Ronde démarrée ! ${pointsControle.length} ${categorie.nom.toLowerCase()}`);
+    navigate('rondes');
+}
+
+// ========== SCANNER QR CODE ET VALIDATION POINTS ==========
+let html5QrScanner = null;
+
+function scannerPointControle(rondeId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const pointsNonValides = r.pointsControle.filter(p => !p.valide);
+
+    showModal('Scanner un point', `
+        <div class="space-y-4">
+            <div id="qr-reader" style="width: 100%;"></div>
+            <div id="qr-reader-results" class="text-center text-sm text-gray-500"></div>
+
+            <div class="flex gap-2">
+                <button onclick="demarrerScanQR(${rondeId})" id="btnStartScan" class="btn btn-primary flex-1">
+                    <i class="fas fa-camera"></i> Activer caméra
+                </button>
+                <button onclick="arreterScanQR()" id="btnStopScan" class="btn btn-secondary flex-1 hidden">
+                    <i class="fas fa-stop"></i> Arrêter
+                </button>
+            </div>
+
+            <div class="border-t pt-4">
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-keyboard mr-1"></i>Saisie manuelle</label>
+                <div class="flex gap-2">
+                    <input type="text" id="qrCodeManuel" class="input flex-1" placeholder="Code QR...">
+                    <button onclick="validerQRCode(${rondeId})" class="btn btn-success"><i class="fas fa-check"></i></button>
+                </div>
+            </div>
+
+            <div class="border-t pt-4">
+                <p class="text-sm font-semibold mb-2"><i class="fas fa-list mr-1"></i>Points restants (${pointsNonValides.length})</p>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                    ${pointsNonValides.map(p => `
+                        <button onclick="ouvrirPanneauValidationPoint(${rondeId}, '${p.id}')" class="w-full p-2 bg-gray-50 dark:bg-slate-700 rounded-lg flex items-center gap-3 text-left hover:bg-blue-50">
+                            <i class="fas fa-circle text-gray-300 text-xs"></i>
+                            <div class="flex-1">
+                                <div class="font-medium text-sm">${p.nom}</div>
+                                <div class="text-xs text-gray-400">${p.chemin || p.localisation || ''}</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `, null, 'Fermer');
+}
+
+function demarrerScanQR(rondeId) {
+    const qrReader = document.getElementById('qr-reader');
+    const resultsDiv = document.getElementById('qr-reader-results');
+    const btnStart = document.getElementById('btnStartScan');
+    const btnStop = document.getElementById('btnStopScan');
+
+    if (!qrReader || typeof Html5Qrcode === 'undefined') {
+        resultsDiv.innerHTML = '<span class="text-red-500">Scanner non disponible</span>';
+        return;
+    }
+
+    btnStart.classList.add('hidden');
+    btnStop.classList.remove('hidden');
+    resultsDiv.innerHTML = '<span class="text-blue-500"><i class="fas fa-spinner fa-spin mr-1"></i>Initialisation...</span>';
+
+    html5QrScanner = new Html5Qrcode("qr-reader");
+
+    html5QrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+            resultsDiv.innerHTML = '<span class="text-green-500"><i class="fas fa-check-circle mr-1"></i>Code: ' + decodedText + '</span>';
+            arreterScanQR();
+            validerQRCodeAuto(rondeId, decodedText);
+        },
+        () => {}
+    ).catch((err) => {
+        resultsDiv.innerHTML = '<span class="text-red-500">Erreur caméra</span>';
+        btnStart.classList.remove('hidden');
+        btnStop.classList.add('hidden');
+    });
+}
+
+function arreterScanQR() {
+    if (html5QrScanner) {
+        html5QrScanner.stop().then(() => {
+            html5QrScanner = null;
+            document.getElementById('btnStartScan')?.classList.remove('hidden');
+            document.getElementById('btnStopScan')?.classList.add('hidden');
+        }).catch(() => {});
+    }
+}
+
+function validerQRCodeAuto(rondeId, code) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle.find(p => p.qrCode?.toLowerCase() === code.toLowerCase());
+
+    if (!point) {
+        showToast('❌ Code QR non reconnu', 'error');
+        return;
+    }
+
+    if (point.valide) {
+        showToast('⚠️ Point déjà validé', 'warning');
+        return;
+    }
+
+    closeModal();
+    ouvrirPanneauValidationPoint(rondeId, point.id);
+}
+
+function validerQRCode(rondeId) {
+    const code = document.getElementById('qrCodeManuel')?.value?.trim();
+    if (!code) {
+        showToast('Entrez un code', 'error');
+        return;
+    }
+    validerQRCodeAuto(rondeId, code);
+}
+
+// ========== PANNEAU VALIDATION POINT (avec signalement anomalie) ==========
+function ouvrirPanneauValidationPoint(rondeId, pointId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle.find(p => String(p.id) === String(pointId));
+    if (!point) return;
+
+    const anomalieExistante = r.anomalies?.find(a => a.pointId === pointId);
+
+    showModal(`Point: ${point.nom}`, `
+        <div class="space-y-4">
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl">
+                <div class="font-semibold text-blue-800 dark:text-blue-300">${point.nom}</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">${point.chemin || point.localisation || ''}</div>
+                ${point.valide ? `<div class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>Validé à ${formatTime(point.heureValidation)}</div>` : ''}
+            </div>
+
+            ${anomalieExistante ? `
+                <div class="bg-${anomalieExistante.horsService ? 'red' : 'orange'}-50 dark:bg-${anomalieExistante.horsService ? 'red' : 'orange'}-900/30 p-4 rounded-xl">
+                    <div class="font-semibold text-${anomalieExistante.horsService ? 'red' : 'orange'}-700 mb-2">
+                        <i class="fas fa-${anomalieExistante.horsService ? 'ban' : 'exclamation-triangle'} mr-2"></i>
+                        Anomalie signalée
+                    </div>
+                    <p class="text-sm">${anomalieExistante.description}</p>
+                </div>
+            ` : ''}
+
+            <div class="border-t pt-4">
+                <div class="font-semibold mb-3"><i class="fas fa-clipboard-check mr-2"></i>État du point</div>
+                
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <button onclick="validerPointSansAnomalie(${rondeId}, '${pointId}')" class="p-4 bg-green-100 dark:bg-green-900/50 rounded-xl text-center hover:ring-2 hover:ring-green-500 transition-all">
+                        <i class="fas fa-check-circle text-green-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-green-700">Conforme</div>
+                    </button>
+                    <button onclick="ouvrirFormulaireAnomalie(${rondeId}, '${pointId}', false)" class="p-4 bg-orange-100 dark:bg-orange-900/50 rounded-xl text-center hover:ring-2 hover:ring-orange-500 transition-all">
+                        <i class="fas fa-exclamation-triangle text-orange-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-orange-700">Anomalie</div>
+                    </button>
+                    <button onclick="ouvrirFormulaireAnomalie(${rondeId}, '${pointId}', true)" class="p-4 bg-red-100 dark:bg-red-900/50 rounded-xl text-center hover:ring-2 hover:ring-red-500 transition-all">
+                        <i class="fas fa-ban text-red-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-red-700">Hors Service</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `, null, 'Annuler');
+}
+
+function validerPointSansAnomalie(rondeId, pointId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle.find(p => String(p.id) === String(pointId));
+    if (!point) return;
+
+    point.valide = true;
+    point.heureValidation = new Date().toISOString();
+
+    sauvegarderVersFirebase();
+    closeModal();
+    showToast(`✅ ${point.nom} validé !`);
+
+    if (navigator.vibrate) navigator.vibrate(200);
+    navigate('rondes');
+}
+
+function ouvrirFormulaireAnomalie(rondeId, pointId, horsService) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const point = r.pointsControle.find(p => String(p.id) === String(pointId));
+    if (!point) return;
+
+    const couleur = horsService ? 'red' : 'orange';
+    const titre = horsService ? '🚫 Signaler Hors Service' : '⚠️ Signaler Anomalie';
+
+    showModal(titre, `
+        <div class="space-y-4">
+            <div class="bg-${couleur}-50 dark:bg-${couleur}-900/30 p-4 rounded-xl">
+                <div class="font-semibold text-${couleur}-700">${point.nom}</div>
+                <div class="text-sm text-gray-600">${point.chemin || point.localisation || ''}</div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description *</label>
+                <textarea id="anomalieDesc" class="input" rows="3" placeholder="${horsService ? 'Décrivez pourquoi le matériel est hors service...' : 'Décrivez l\'anomalie constatée...'}"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-camera mr-1"></i>Photo (optionnel)</label>
+                <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input">
+            </div>
+
+            ${horsService && point.materielId ? `
+                <div class="bg-red-100 dark:bg-red-900/30 p-3 rounded-lg text-sm text-red-700">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Le matériel sera marqué "Hors Service" et une consigne particulière sera créée automatiquement.
+                </div>
+            ` : ''}
+        </div>
+    `, async () => {
+        const description = document.getElementById('anomalieDesc').value.trim();
+        if (!description) {
+            showToast('Décrivez l\'anomalie', 'error');
+            return;
+        }
+
+        let photoBase64 = null;
+        const photoInput = document.getElementById('anomaliePhoto');
+        if (photoInput?.files?.length > 0) {
+            photoBase64 = await convertirEnBase64(photoInput.files[0]);
+        }
+
+        // Valider le point
+        point.valide = true;
+        point.heureValidation = new Date().toISOString();
+
+        // Ajouter l'anomalie
+        if (!r.anomalies) r.anomalies = [];
+        r.anomalies.push({
+            id: genId(),
+            pointId: pointId,
+            pointNom: point.nom,
+            description: description,
+            horsService: horsService,
+            photo: photoBase64,
+            date: new Date().toISOString(),
+            agentId: currentUser?.id
+        });
+
+        // Si matériel et hors service, mettre à jour le matériel
+        if (horsService && point.materielId) {
+            const mat = DB.materiels.find(m => m.id === point.materielId);
+            if (mat) {
+                mat.statut = 'Hors Service';
+                mat.observation = description;
+
+                // Créer consigne particulière
+                DB.consignes.push({
+                    id: genId(),
+                    titre: `${mat.nom} - HORS SERVICE`,
+                    niveau: 'Particulière',
+                    destinataire: 'Tout le monde',
+                    priorite: 'Haute',
+                    contenu: `⚠️ MATÉRIEL HORS SERVICE\n\nType: ${mat.type}\nLocalisation: ${mat.localisation}\n\nProblème: ${description}\n\nSignalé le ${new Date().toLocaleDateString('fr-FR')} par ${currentUser?.prenom} ${currentUser?.nom}`,
+                    dateDebut: new Date().toISOString().split('T')[0],
+                    dateFin: null,
+                    active: true,
+                    materielId: mat.id
+                });
+            }
+        }
+
+        const graviteLabel = horsService ? '🔴 HORS SERVICE' : '🟠 Anomalie';
+        addMainCourante('Anomalie Ronde', `${graviteLabel} - ${point.nom}: ${description}`, currentUser?.id);
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast(horsService ? '🚫 Matériel marqué Hors Service' : '⚠️ Anomalie signalée', horsService ? 'error' : 'warning');
+
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        navigate('rondes');
+    }, 'Enregistrer');
+}
+
+function signalerAnomalieMobile(rondeId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    showModal('Signaler une anomalie', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <input type="text" id="anomalieLoc" class="input" placeholder="Où avez-vous constaté l'anomalie ?">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description *</label>
+                <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez l'anomalie..."></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-camera mr-1"></i>Photo</label>
+                <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input">
+            </div>
+        </div>
+    `, async () => {
+        const loc = document.getElementById('anomalieLoc')?.value || 'Non précisé';
+        const desc = document.getElementById('anomalieDesc')?.value;
+
+        if (!desc) {
+            showToast('Décrivez l\'anomalie', 'error');
+            return;
+        }
+
+        let photoBase64 = null;
+        const photoInput = document.getElementById('anomaliePhoto');
+        if (photoInput?.files?.length > 0) {
+            photoBase64 = await convertirEnBase64(photoInput.files[0]);
+        }
+
+        if (!r.anomalies) r.anomalies = [];
+        r.anomalies.push({
+            id: genId(),
+            localisation: loc,
+            description: desc,
+            horsService: false,
+            photo: photoBase64,
+            date: new Date().toISOString(),
+            agentId: currentUser?.id
+        });
+
+        addMainCourante('Anomalie Ronde', `${r.nom} - ${loc}: ${desc}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('⚠️ Anomalie signalée');
+        navigate('rondes');
+    }, 'Signaler');
+}
+
+function voirPointsRonde(rondeId) {
+    const r = DB.rondes.find(x => x.id === rondeId);
+    if (!r) return;
+
+    const pointsValides = r.pointsControle?.filter(p => p.valide) || [];
+    const pointsNonValides = r.pointsControle?.filter(p => !p.valide) || [];
+
+    showModal('Points de contrôle', `
+        <div class="space-y-4 max-h-96 overflow-y-auto">
+            ${pointsNonValides.length ? `
+            <div>
+                <h3 class="text-sm font-bold text-red-600 mb-2"><i class="fas fa-circle text-xs mr-1"></i>À valider (${pointsNonValides.length})</h3>
+                <div class="space-y-2">
+                    ${pointsNonValides.map(p => `
+                        <button onclick="closeModal(); ouvrirPanneauValidationPoint(${rondeId}, '${p.id}')" class="w-full p-3 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center gap-3 text-left">
+                            <i class="fas fa-times-circle text-red-400"></i>
+                            <div class="flex-1">
+                                <div class="font-medium text-sm">${p.nom}</div>
+                                <div class="text-xs text-gray-500">${p.chemin || ''}</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-300"></i>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+
+            ${pointsValides.length ? `
+            <div>
+                <h3 class="text-sm font-bold text-green-600 mb-2"><i class="fas fa-check-circle text-xs mr-1"></i>Validés (${pointsValides.length})</h3>
+                <div class="space-y-2">
+                    ${pointsValides.map(p => {
+                        const anomalie = r.anomalies?.find(a => a.pointId === p.id);
+                        const couleur = anomalie ? (anomalie.horsService ? 'red' : 'orange') : 'green';
+                        return `
+                            <div class="p-3 ${getBgClassFromCouleur(couleur)} rounded-lg flex items-center gap-3">
+                                <i class="fas ${getIconClassFromCouleur(couleur)}"></i>
+                                <div class="flex-1">
+                                    <div class="font-medium text-sm">${p.nom}</div>
+                                    <div class="text-xs text-gray-500">${formatTime(p.heureValidation)}</div>
+                                    ${anomalie ? `<div class="text-xs text-${couleur}-600 mt-1">${anomalie.horsService ? '🚫 HS' : '⚠️'} ${anomalie.description.substring(0, 50)}...</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function terminerRondeAvecDetails(id) {
+    const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+
+    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+    const totalPoints = r.pointsControle?.length || 0;
+    const tousValides = pointsValides === totalPoints;
+    const couleur = getStatutCouleurRonde(r);
+    const hasHS = r.anomalies?.some(a => a.horsService);
+    const hasAnomalies = r.anomalies?.length > 0;
+
+    showModal('Terminer la ronde', `
+        <div class="space-y-4">
+            <div class="bg-${tousValides ? (couleur === 'red' ? 'red' : couleur === 'orange' ? 'orange' : 'green') : 'orange'}-50 dark:bg-${tousValides ? (couleur === 'red' ? 'red' : couleur === 'orange' ? 'orange' : 'green') : 'orange'}-900/30 p-4 rounded-lg">
+                <div class="font-bold text-${tousValides ? (couleur === 'red' ? 'red' : couleur === 'orange' ? 'orange' : 'green') : 'orange'}-700">
+                    ${tousValides ? (hasHS ? '🚫 Ronde avec matériel(s) HS' : hasAnomalies ? '⚠️ Ronde avec anomalie(s)' : '✅ Tous les points validés') : `⚠️ ${totalPoints - pointsValides} point(s) non validé(s)`}
+                </div>
+                <div class="text-sm mt-1">${pointsValides}/${totalPoints} points de contrôle</div>
+            </div>
+
+            ${hasHS ? `
+            <div class="bg-red-100 dark:bg-red-900/30 p-4 rounded-lg">
+                <div class="font-bold text-red-700 mb-2">🚫 Matériel(s) Hors Service</div>
+                <ul class="text-sm space-y-1">
+                    ${r.anomalies.filter(a => a.horsService).map(a => `<li class="text-red-600">• ${a.pointNom || 'Point'}: ${a.description.substring(0, 50)}...</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            ${hasAnomalies && !hasHS ? `
+            <div class="bg-orange-100 dark:bg-orange-900/30 p-4 rounded-lg">
+                <div class="font-bold text-orange-700 mb-2">⚠️ ${r.anomalies.length} anomalie(s)</div>
+                <ul class="text-sm space-y-1">
+                    ${r.anomalies.map(a => `<li>• ${a.pointNom || a.localisation || 'Point'}: ${a.description.substring(0, 50)}...</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Observation de fin</label>
+                <textarea id="obsFin" class="input" rows="3" placeholder="Observations finales...">${r.observationFin || ''}</textarea>
+            </div>
+        </div>
+    `, () => {
+        r.heureFin = new Date().toISOString();
+        r.statut = 'Terminée';
+        r.observationFin = document.getElementById('obsFin').value;
+
+        const agent = DB.agents.find(a => a.id === r.agentId);
+        const duree = Math.round((new Date(r.heureFin) - new Date(r.heureDebut)) / 60000);
+        const statutLabel = hasHS ? '🔴 HS' : hasAnomalies ? '🟠 Anomalies' : '🟢 OK';
+        addMainCourante('Fin Ronde', `${statusLabel} ${r.type} - ${agent?.prenom} ${agent?.nom} (${pointsValides}/${totalPoints}, ${duree}min)`, r.agentId);
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Ronde terminée');
+        navigate('rondes');
+    });
+}
+
+function voirRonde(id) {
+    const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+
+    const agent = DB.agents.find(a => a.id === r.agentId);
+    const pointsValides = r.pointsControle?.filter(p => p.valide).length || 0;
+    const totalPoints = r.pointsControle?.length || 0;
+    const couleur = getStatutCouleurRonde(r);
+
+    showModal('Détails de la Ronde', `
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold">${r.nom || r.type}</h3>
+                <span class="badge ${r.heureFin ? getBadgeClassFromCouleur(couleur) : 'badge-warning'}">${r.heureFin ? 'Terminée' : 'En cours'}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Agent</div>
+                    <div class="font-medium">${agent?.prenom || ''} ${agent?.nom || ''}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Points</div>
+                    <div class="font-medium">${pointsValides}/${totalPoints}</div>
+                </div>
+            </div>
+
+            ${r.anomalies?.length ? `
+            <div class="bg-${r.anomalies.some(a => a.horsService) ? 'red' : 'orange'}-50 dark:bg-${r.anomalies.some(a => a.horsService) ? 'red' : 'orange'}-900/30 p-4 rounded-lg">
+                <div class="font-bold mb-2">${r.anomalies.some(a => a.horsService) ? '🚫' : '⚠️'} Anomalies (${r.anomalies.length})</div>
+                <ul class="text-sm space-y-2">
+                    ${r.anomalies.map(a => `
+                        <li class="flex items-start gap-2">
+                            <i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mt-1"></i>
+                            <div>
+                                <div class="font-medium">${a.pointNom || a.localisation || 'Point'}</div>
+                                <div class="text-gray-600">${a.description}</div>
+                            </div>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+            ` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function effectuerRonde(id) {
+    const r = DB.rondes.find(x => x.id === id);
+    if (!r) return;
+    scannerPointControle(id);
+}
+
+// ========== MAIN COURANTE ==========
+function renderMainCourante() {
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold"><i class="fas fa-clipboard-list mr-2 text-primary-500"></i>Main Courante</h1>
+            <button onclick="window.print()" class="btn btn-secondary no-print"><i class="fas fa-print"></i></button>
+        </div>
+
+        <div class="card">
+            <div class="gradient-header text-white p-4 font-semibold">Événements (${DB.mainCourante.length})</div>
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead><tr><th>Date/Heure</th><th>Type</th><th>Description</th><th>Agent</th></tr></thead>
+                    <tbody>
+                        ${DB.mainCourante.length ? DB.mainCourante.slice(0, 100).map(m => `
+                            <tr>
+                                <td class="whitespace-nowrap">${formatDateTime(m.date)}</td>
+                                <td><span class="badge badge-info">${m.type}</span></td>
+                                <td>${m.description}</td>
+                                <td>${m.agent}</td>
+                            </tr>
+                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// ========== ÉVÉNEMENTS ==========
+const typesEvt = ['Alarme Incendie', 'Secours à personne', 'Problème technique', 'Incident', 'Anomalie'];
+
+function renderEvenements() {
+    const evtsActifs = DB.evenements.filter(e => e.statut !== 'Terminé');
+    const evtsTermines = DB.evenements.filter(e => e.statut === 'Terminé');
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold"><i class="fas fa-exclamation-triangle mr-2 text-primary-500"></i>Événements</h1>
+            <button onclick="showModalEvenement()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel événement</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="stat-card bg-red-50"><div class="text-2xl font-bold text-red-600">${DB.evenements.filter(e => e.statut === 'Début').length}</div><div class="text-xs">Alertes</div></div>
+            <div class="stat-card bg-orange-50"><div class="text-2xl font-bold text-orange-600">${DB.evenements.filter(e => e.statut === 'En cours').length}</div><div class="text-xs">En cours</div></div>
+            <div class="stat-card bg-green-50"><div class="text-2xl font-bold text-green-600">${evtsTermines.length}</div><div class="text-xs">Terminés</div></div>
+        </div>
+
+        ${evtsActifs.length ? `
+        <div class="card mb-6">
+            <div class="gradient-danger text-white p-4 font-semibold">Événements actifs</div>
+            <div class="p-4 space-y-3">
+                ${evtsActifs.map(e => {
+                    const agent = DB.agents.find(a => a.id === e.agentId);
+                    return `
+                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
+                            <div class="flex items-center gap-4">
+                                <span class="status-dot ${getStatusColor(e.statut)}"></span>
+                                <div>
+                                    <div class="font-semibold">${e.type}</div>
+                                    <div class="text-sm text-gray-500">${e.localisation || ''} • ${formatDateTime(e.date)}</div>
+                                </div>
+                            </div>
+                            <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        <div class="card">
+            <div class="gradient-success text-white p-4 font-semibold">Événements terminés</div>
+            <div class="p-4">
+                ${evtsTermines.length ? evtsTermines.slice(0, 10).map(e => `
+                    <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
+                        <div>
+                            <div class="font-medium">${e.type}</div>
+                            <div class="text-sm text-gray-500">${formatDateTime(e.date)}</div>
+                        </div>
+                        <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
+                    </div>
+                `).join('') : '<p class="text-gray-500 text-center py-4">Aucun</p>'}
+            </div>
+        </div>
+    `;
+}
+
+function showModalEvenement() {
+    const agentsPoste = getAgentsEnPoste();
+    showModal('Nouvel Événement', `
+        <div class="space-y-4">
+            <div><label class="block text-sm font-semibold mb-2">Type</label><select id="evtType" class="input">${typesEvt.map(t => `<option>${t}</option>`).join('')}</select></div>
+            <div><label class="block text-sm font-semibold mb-2">Agent</label><select id="evtAgent" class="input">${agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('')}</select></div>
+            <div><label class="block text-sm font-semibold mb-2">Localisation</label><input type="text" id="evtLoc" class="input" placeholder="Ex: Hall"></div>
+            <div><label class="block text-sm font-semibold mb-2">Description</label><textarea id="evtDesc" class="input" rows="3"></textarea></div>
+        </div>
+    `, () => {
+        const desc = document.getElementById('evtDesc').value;
+        if (!desc) return showToast('Entrez une description', 'error');
+
+        const evt = {
+            id: genId(),
+            type: document.getElementById('evtType').value,
+            statut: 'Début',
+            agentId: parseInt(document.getElementById('evtAgent').value),
+            localisation: document.getElementById('evtLoc').value,
+            description: desc,
+            date: new Date().toISOString(),
+            suivis: []
+        };
+        DB.evenements.unshift(evt);
+        addMainCourante(evt.type, `DÉBUT: ${desc}`, evt.agentId);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Événement créé');
+        navigate('evenements');
+    });
+}
+
+function voirEvenement(id) {
+    const e = DB.evenements.find(x => x.id === id);
+    if (!e) return;
+    const agent = DB.agents.find(a => a.id === e.agentId);
+
+    showModal('Événement', `
+        <div class="space-y-4">
+            <div class="flex items-center gap-4">
+                <span class="status-dot ${getStatusColor(e.statut)}" style="width:20px;height:20px;"></span>
+                <div>
+                    <div class="text-xl font-bold">${e.type}</div>
+                    <span class="badge badge-${e.statut === 'Terminé' ? 'success' : 'warning'}">${e.statut}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
+                <p>${e.description}</p>
+            </div>
+            <div class="text-sm text-gray-500">
+                <div>Agent: ${agent?.prenom} ${agent?.nom}</div>
+                <div>Date: ${formatDateTime(e.date)}</div>
+                <div>Localisation: ${e.localisation || '-'}</div>
+            </div>
+            ${e.statut !== 'Terminé' ? `
+                <div class="flex gap-2 pt-4 border-t">
+                    <button onclick="closeModal(); terminerEvenement(${e.id})" class="btn btn-success flex-1"><i class="fas fa-check"></i> Terminer</button>
+                </div>
+            ` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function terminerEvenement(id) {
+    const e = DB.evenements.find(x => x.id === id);
+    if (!e) return;
+
+    showModal('Terminer', `
+        <div class="space-y-4">
+            <div><label class="block text-sm font-semibold mb-2">Compte-rendu</label><textarea id="crTexte" class="input" rows="4"></textarea></div>
+        </div>
+    `, () => {
+        const cr = document.getElementById('crTexte').value;
+        if (!cr) return showToast('Rédigez le compte-rendu', 'error');
+
+        e.statut = 'Terminé';
+        e.compteRendu = cr;
+        e.dateCloture = new Date().toISOString();
+        addMainCourante('Événement terminé', `${e.type}: ${cr.substring(0, 100)}...`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Événement clôturé');
+        navigate('evenements');
+    });
+}
+
+// ========== MATÉRIELS ==========
+const typesMat = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'Éclairage', 'BAES', 'Désenfumage', 'Autre'];
+const statutsMat = ['Opérationnel', 'Défaillant', 'En Maintenance', 'Hors Service'];
+
+function renderMateriels() {
+    const stats = { total: DB.materiels.length, ok: 0, defaillant: 0, hs: 0 };
+    DB.materiels.forEach(m => {
+        if (m.statut === 'Opérationnel') stats.ok++;
+        else if (m.statut === 'Défaillant') stats.defaillant++;
+        else if (m.statut === 'Hors Service') stats.hs++;
+    });
+
+    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
+    const canCreate = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold"><i class="fas fa-fire-extinguisher text-primary-500 mr-2"></i>Matériels</h1>
+            ${canCreate ? '<button onclick="showModalMateriel()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Nouveau</button>' : ''}
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-blue-600">${stats.total}</div><div class="text-xs">Total</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-green-600">${stats.ok}</div><div class="text-xs">Opérationnels</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-orange-600">${stats.defaillant}</div><div class="text-xs">Défaillants</div></div>
+            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-red-600">${stats.hs}</div><div class="text-xs">Hors Service</div></div>
+        </div>
+
+        <div class="card">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead><tr><th>Nom</th><th>Localisation</th><th>État</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        ${DB.materiels.map(m => {
+                            const sClass = { 'Opérationnel': 'success', 'Défaillant': 'warning', 'En Maintenance': 'info', 'Hors Service': 'danger' }[m.statut] || 'secondary';
+                            return `
+                                <tr>
+                                    <td>
+                                        <div class="font-semibold">${m.nom}</div>
+                                        <div class="text-sm text-gray-500">${m.type}</div>
+                                    </td>
+                                    <td class="text-gray-600">${m.localisation || '-'}</td>
+                                    <td><span class="badge badge-${sClass}">${m.statut}</span></td>
+                                    <td>
+                                        <button onclick="voirMateriel(${m.id})" class="btn btn-icon btn-sm btn-secondary"><i class="fas fa-eye"></i></button>
+                                        ${!isSsiap1 ? `<button onclick="editMat(${m.id})" class="btn btn-icon btn-sm btn-primary"><i class="fas fa-edit"></i></button>` : ''}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function showModalMateriel() {
+    const batimentsOptions = configEtablissement.batiments.map(b => `<option value="${b.id}">${b.nom}</option>`).join('');
+
+    showModal('Nouveau Matériel', `
+        <div class="space-y-4">
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="block text-xs mb-1">Bâtiment</label><select id="matBatiment" class="input" onchange="updateSecteursMat()"><option value="">Choisir...</option>${batimentsOptions}</select></div>
+                <div><label class="block text-xs mb-1">Secteur</label><select id="matSecteur" class="input" onchange="updateZonesMat()" disabled><option value="">Choisir...</option></select></div>
+                <div><label class="block text-xs mb-1">Zone</label><select id="matZone" class="input" disabled><option value="">Choisir...</option></select></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Type</label><select id="matType" class="input">${typesMat.map(t => `<option>${t}</option>`).join('')}</select></div>
+                <div><label class="block text-sm font-semibold mb-2">Numéro</label><input type="text" id="matNumero" class="input" placeholder="001"></div>
+            </div>
+            <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="matNom" class="input" placeholder="Nom du matériel"></div>
+            <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="matStatut" class="input">${statutsMat.map(s => `<option>${s}</option>`).join('')}</select></div>
+        </div>
+    `, () => {
+        const nom = document.getElementById('matNom').value;
+        const batimentId = document.getElementById('matBatiment').value;
+        const secteurId = document.getElementById('matSecteur').value;
+        const zone = document.getElementById('matZone').value;
+
+        if (!nom || !batimentId || !secteurId || !zone) {
+            showToast('Remplissez tous les champs', 'error');
+            return;
+        }
+
+        const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+        const secteur = batiment?.secteurs.find(s => s.id === secteurId);
+        const localisation = `${batiment?.nom} > ${secteur?.nom} > ${zone}`;
+
+        DB.materiels.push({
+            id: genId(),
+            nom,
+            type: document.getElementById('matType').value,
+            statut: document.getElementById('matStatut').value,
+            localisation,
+            batimentId,
+            secteurId,
+            zone,
+            codeQR: `MAT-${Date.now()}`,
+            dateCreation: new Date().toISOString()
+        });
+
+        addMainCourante('Matériel', `Création: ${nom}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Matériel créé');
+        navigate('materiels');
+    });
+}
+
+function updateSecteursMat() {
+    const batimentId = document.getElementById('matBatiment').value;
+    const secteurSelect = document.getElementById('matSecteur');
+    const zoneSelect = document.getElementById('matZone');
+
+    secteurSelect.innerHTML = '<option value="">Choisir...</option>';
+    zoneSelect.innerHTML = '<option value="">Choisir...</option>';
+    zoneSelect.disabled = true;
+
+    if (!batimentId) {
+        secteurSelect.disabled = true;
+        return;
+    }
+
+    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+    if (batiment) {
+        batiment.secteurs.forEach(s => {
+            secteurSelect.innerHTML += `<option value="${s.id}">${s.nom}</option>`;
+        });
+        secteurSelect.disabled = false;
+    }
+}
+
+function updateZonesMat() {
+    const batimentId = document.getElementById('matBatiment').value;
+    const secteurId = document.getElementById('matSecteur').value;
+    const zoneSelect = document.getElementById('matZone');
+
+    zoneSelect.innerHTML = '<option value="">Choisir...</option>';
+
+    if (!secteurId) {
+        zoneSelect.disabled = true;
+        return;
+    }
+
+    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
+    const secteur = batiment?.secteurs.find(s => s.id === secteurId);
+
+    if (secteur) {
+        secteur.zones.forEach(z => {
+            zoneSelect.innerHTML += `<option value="${z}">${z}</option>`;
+        });
+        zoneSelect.disabled = false;
+    }
+}
+
+function voirMateriel(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    const sClass = { 'Opérationnel': 'success', 'Défaillant': 'warning', 'En Maintenance': 'info', 'Hors Service': 'danger' }[m.statut] || 'secondary';
+
+    showModal('Fiche Matériel', `
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold">${m.nom}</h3>
+                <span class="badge badge-${sClass}">${m.statut}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Type</div><div class="font-medium">${m.type}</div></div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Localisation</div><div class="font-medium">${m.localisation || '-'}</div></div>
+            </div>
+            ${m.observation ? `<div class="bg-yellow-50 p-3 rounded-lg"><div class="text-xs text-yellow-600">Observation</div><div class="text-sm">${m.observation}</div></div>` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function editMat(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    showModal('Modifier Matériel', `
+        <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
+                <div class="font-bold">${m.nom}</div>
+                <div class="text-sm text-gray-500">${m.localisation}</div>
+            </div>
+            <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="editMatStatut" class="input">${statutsMat.map(s => `<option ${m.statut === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+            <div><label class="block text-sm font-semibold mb-2">Observation</label><textarea id="editMatObs" class="input" rows="3">${m.observation || ''}</textarea></div>
+        </div>
+    `, () => {
+        const ancienStatut = m.statut;
+        m.statut = document.getElementById('editMatStatut').value;
+        m.observation = document.getElementById('editMatObs').value;
+
+        if (m.statut === 'Hors Service' && ancienStatut !== 'Hors Service') {
+            DB.consignes.push({
+                id: genId(),
+                titre: `${m.nom} - HORS SERVICE`,
+                niveau: 'Particulière',
+                destinataire: 'Tout le monde',
+                priorite: 'Haute',
+                contenu: `⚠️ MATÉRIEL HORS SERVICE\n\nLocalisation: ${m.localisation}\n\n${m.observation || ''}`,
+                dateDebut: new Date().toISOString().split('T')[0],
+                dateFin: null,
+                active: true,
+                materielId: m.id
+            });
+        }
+
+        addMainCourante('Matériel', `Modification: ${m.nom} - ${m.statut}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Matériel modifié');
+        navigate('materiels');
+    });
+}
+
+// ========== CONSIGNES ==========
+const niveauxConsigne = ['Courante', 'Particulière'];
+const destinataires = ['Tout le monde', 'Chef de poste', 'Chef de service'];
+
+function renderConsignes() {
+    const filteredConsignes = DB.consignes.filter(c => {
+        if (c.destinataire === 'Tout le monde') return true;
+        if (c.destinataire === 'Chef de poste' && currentUser?.qualification !== 'SSIAP 1') return true;
+        if (c.destinataire === 'Chef de service' && (currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur')) return true;
+        return false;
+    });
+
+    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2 text-primary-500"></i>Consignes</h1>
+            ${!isSsiap1 ? '<button onclick="showModalConsigne()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle</button>' : ''}
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+            <div class="card">
+                <div class="gradient-warning text-white p-4 font-semibold">Consignes Particulières</div>
+                <div class="p-4 space-y-3">
+                    ${filteredConsignes.filter(c => c.niveau === 'Particulière' && c.active).map(c => `
+                        <div class="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-xl">
+                            <div class="font-semibold">${c.titre}</div>
+                            <p class="text-sm text-gray-600 mt-1">${c.contenu.substring(0, 100)}...</p>
+                        </div>
+                    `).join('') || '<p class="text-gray-500 text-center py-4">Aucune</p>'}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="gradient-info text-white p-4 font-semibold">Consignes Courantes</div>
+                <div class="p-4 space-y-3">
+                    ${filteredConsignes.filter(c => c.niveau === 'Courante' && c.active).map(c => `
+                        <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
+                            <div class="font-semibold">${c.titre}</div>
+                            <p class="text-sm text-gray-600 mt-1">${c.contenu.substring(0, 100)}...</p>
+                        </div>
+                    `).join('') || '<p class="text-gray-500 text-center py-4">Aucune</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function showModalConsigne() {
+    showModal('Nouvelle Consigne', `
+        <div class="space-y-4">
+            <div><label class="block text-sm font-semibold mb-2">Titre</label><input type="text" id="consTitre" class="input"></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Niveau</label><select id="consNiveau" class="input">${niveauxConsigne.map(n => `<option>${n}</option>`).join('')}</select></div>
+                <div><label class="block text-sm font-semibold mb-2">Destinataire</label><select id="consDest" class="input">${destinataires.map(d => `<option>${d}</option>`).join('')}</select></div>
+            </div>
+            <div><label class="block text-sm font-semibold mb-2">Contenu</label><textarea id="consContenu" class="input" rows="4"></textarea></div>
+        </div>
+    `, () => {
+        const titre = document.getElementById('consTitre').value;
+        const contenu = document.getElementById('consContenu').value;
+        if (!titre || !contenu) return showToast('Remplissez les champs', 'error');
+
+        DB.consignes.push({
+            id: genId(),
+            titre,
+            niveau: document.getElementById('consNiveau').value,
+            destinataire: document.getElementById('consDest').value,
+            priorite: 'Normale',
+            contenu,
+            dateDebut: new Date().toISOString().split('T')[0],
+            dateFin: null,
+            active: true
+        });
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Consigne créée');
+        navigate('consignes');
+    });
+}
+
+// ========== AGENTS ==========
+function renderAgents() {
+    const agentsTries = [...DB.agents].sort((a, b) => {
+        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
+        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
+    });
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold"><i class="fas fa-users mr-2 text-primary-500"></i>Agents</h1>
+            <button onclick="showModalAgent()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvel agent</button>
+        </div>
+
+        <div class="card">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead><tr><th>Agent</th><th>Qualification</th><th>Téléphone</th><th>Statut</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        ${agentsTries.map(a => `
+                            <tr>
+                                <td>
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl gradient-header flex items-center justify-center text-white font-semibold">${a.prenom?.[0] || ''}${a.nom?.[0] || ''}</div>
+                                        <div>
+                                            <div class="font-medium">${a.prenom} ${a.nom}</div>
+                                            <div class="text-xs text-gray-500">${a.email || ''}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="badge badge-info">${a.qualification}</span></td>
+                                <td class="text-sm">${a.telephone || '-'}</td>
+                                <td><span class="badge ${a.actif ? 'badge-success' : 'badge-danger'}">${a.actif ? 'Actif' : 'Inactif'}</span></td>
+                                <td><button onclick="voirAgent('${a.id}')" class="btn btn-icon btn-secondary btn-sm"><i class="fas fa-eye"></i></button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function voirAgent(id) {
+    const a = DB.agents.find(x => String(x.id) === String(id));
+    if (!a) return;
+
+    const pin = obtenirCodePin(a);
+
+    showModal('Fiche Agent', `
+        <div class="space-y-4">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-16 h-16 rounded-xl gradient-header flex items-center justify-center text-white text-2xl font-semibold">${a.prenom[0]}${a.nom[0]}</div>
+                <div>
+                    <div class="text-xl font-bold">${a.prenom} ${a.nom}</div>
+                    <span class="badge badge-info">${a.qualification}</span>
+                    <span class="badge ${a.actif ? 'badge-success' : 'badge-danger'} ml-2">${a.actif ? 'Actif' : 'Inactif'}</span>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                <div class="text-sm font-semibold text-blue-700">Code PIN:</div>
+                <div class="text-2xl font-mono font-bold text-blue-600">${pin}</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Email</div><div class="font-medium">${a.email || '-'}</div></div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Téléphone</div><div class="font-medium">${a.telephone || '-'}</div></div>
+            </div>
+        </div>
+    `, null, 'Fermer');
+}
+
+function showModalAgent() {
+    showModal('Nouvel Agent', `
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Prénom</label><input type="text" id="agentPrenom" class="input"></div>
+                <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="agentNom" class="input"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Qualification</label><select id="agentQualif" class="input"><option>SSIAP 1</option><option>SSIAP 2</option><option>SSIAP 3</option><option>Administrateur</option></select></div>
+                <div><label class="block text-sm font-semibold mb-2">Entreprise</label><input type="text" id="agentEntr" class="input" value="SecuriPlus"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold mb-2">Email</label><input type="email" id="agentEmail" class="input"></div>
+                <div><label class="block text-sm font-semibold mb-2">Téléphone</label><input type="tel" id="agentTelephone" class="input"></div>
+            </div>
+            <div><label class="block text-sm font-semibold mb-2">Date début contrat</label><input type="date" id="agentDebutContrat" class="input"></div>
+        </div>
+    `, () => {
+        const prenom = document.getElementById('agentPrenom').value;
+        const nom = document.getElementById('agentNom').value;
+        if (!prenom || !nom) return showToast('Remplissez les champs', 'error');
+
+        DB.agents.push({
+            id: genId(),
+            prenom,
+            nom,
+            qualification: document.getElementById('agentQualif').value,
+            entreprise: document.getElementById('agentEntr').value,
+            email: document.getElementById('agentEmail').value,
+            telephone: document.getElementById('agentTelephone').value,
+            dateDebutContrat: document.getElementById('agentDebutContrat').value,
+            actif: true
+        });
+
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('Agent créé');
+        navigate('agents');
+        initLogin();
+    });
+}
+
 // ========== ADMINISTRATION ==========
 let adminTab = 'etablissement';
 
