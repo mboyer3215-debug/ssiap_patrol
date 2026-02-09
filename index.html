@@ -2165,26 +2165,45 @@ function effectuerRonde(id) {
 
 // ========== MAIN COURANTE ==========
 function renderMainCourante() {
+    const canEdit = currentUser?.qualification === 'SSIAP 2' || currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
+    
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold"><i class="fas fa-clipboard-list mr-2 text-primary-500"></i>Main Courante</h1>
-            <button onclick="window.print()" class="btn btn-secondary no-print"><i class="fas fa-print"></i></button>
+            <div class="flex gap-2">
+                ${canEdit ? '<button onclick="ajouterEntreeMainCourante()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Ajouter</button>' : ''}
+                <button onclick="window.print()" class="btn btn-secondary no-print"><i class="fas fa-print"></i></button>
+            </div>
         </div>
 
         <div class="card">
             <div class="gradient-header text-white p-4 font-semibold">Événements (${DB.mainCourante.length})</div>
             <div class="overflow-x-auto">
                 <table class="table">
-                    <thead><tr><th>Date/Heure</th><th>Type</th><th>Description</th><th>Agent</th></tr></thead>
+                    <thead><tr><th>Date/Heure</th><th>Type</th><th>Description</th><th>Agent</th>${canEdit ? '<th>Actions</th>' : ''}</tr></thead>
                     <tbody>
-                        ${DB.mainCourante.length ? DB.mainCourante.slice(0, 100).map(m => `
-                            <tr>
-                                <td class="whitespace-nowrap">${formatDateTime(m.date)}</td>
-                                <td><span class="badge badge-info">${m.type}</span></td>
-                                <td>${m.description}</td>
-                                <td>${m.agent}</td>
-                            </tr>
-                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
+                        ${DB.mainCourante.length ? DB.mainCourante.slice(0, 100).map(m => {
+                            const typeBadgeClass = getMainCouranteBadgeClass(m.type, m.statut);
+                            return `
+                                <tr>
+                                    <td class="whitespace-nowrap">${formatDateTime(m.date)}</td>
+                                    <td><span class="badge ${typeBadgeClass}">${m.type}</span></td>
+                                    <td>
+                                        <div>${m.description}</div>
+                                        ${m.localisation ? `<div class="text-xs text-gray-500"><i class="fas fa-map-marker-alt mr-1"></i>${m.localisation}</div>` : ''}
+                                    </td>
+                                    <td>${m.agent}</td>
+                                    ${canEdit ? `
+                                        <td>
+                                            <div class="flex gap-1">
+                                                <button onclick="modifierEntreeMainCourante('${m.id}')" class="btn btn-icon btn-sm btn-secondary" title="Modifier"><i class="fas fa-edit"></i></button>
+                                                <button onclick="supprimerEntreeMainCourante('${m.id}')" class="btn btn-icon btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </td>
+                                    ` : ''}
+                                </tr>
+                            `;
+                        }).join('') : '<tr><td colspan="5" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -2192,12 +2211,145 @@ function renderMainCourante() {
     `;
 }
 
+function getMainCouranteBadgeClass(type, statut) {
+    // Types d'urgence/alerte en rouge
+    const typesRouge = ['Alarme Incendie', 'Secours à personne', 'Alerte', 'Début', 'Anomalie Ronde', 'Événement'];
+    // Types en cours en orange
+    const typesOrange = ['En cours', 'Ronde', 'Départ Ronde'];
+    // Types terminés/normaux en vert
+    const typesVert = ['Terminé', 'Fin Ronde', 'Fin de Poste', 'Vérifications'];
+    
+    if (statut === 'Terminé' || typesVert.some(t => type.includes(t))) {
+        return 'badge-success';
+    }
+    if (statut === 'En cours' || typesOrange.some(t => type.includes(t))) {
+        return 'badge-warning';
+    }
+    if (typesRouge.some(t => type.includes(t))) {
+        return 'badge-danger';
+    }
+    return 'badge-info';
+}
+
+function ajouterEntreeMainCourante() {
+    const typesMainCourante = [
+        'Prise de Poste', 'Fin de Poste', 'Ronde', 'Événement', 
+        'Alarme Incendie', 'Secours à personne', 'Incident', 
+        'Intervention technique', 'Visite', 'Observation', 'Autre'
+    ];
+    
+    showModal('Nouvelle entrée', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Type *</label>
+                <select id="mcType" class="input">
+                    ${typesMainCourante.map(t => `<option value="${t}">${t}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <input type="text" id="mcLocalisation" class="input" placeholder="Ex: Hall d'entrée, Parking...">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description *</label>
+                <textarea id="mcDescription" class="input" rows="4" placeholder="Décrivez l'événement..."></textarea>
+            </div>
+        </div>
+    `, () => {
+        const type = document.getElementById('mcType').value;
+        const localisation = document.getElementById('mcLocalisation').value.trim();
+        const description = document.getElementById('mcDescription').value.trim();
+        
+        if (!description) {
+            showToast('Entrez une description', 'error');
+            return;
+        }
+        
+        const entree = {
+            id: genId(),
+            date: new Date().toISOString(),
+            type: type,
+            description: description,
+            localisation: localisation,
+            agent: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+            agentId: currentUser?.id
+        };
+        
+        DB.mainCourante.unshift(entree);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Entrée ajoutée');
+        navigate('mainCourante');
+    });
+}
+
+function modifierEntreeMainCourante(id) {
+    const entree = DB.mainCourante.find(m => String(m.id) === String(id));
+    if (!entree) return;
+    
+    const typesMainCourante = [
+        'Prise de Poste', 'Fin de Poste', 'Ronde', 'Événement', 
+        'Alarme Incendie', 'Secours à personne', 'Incident', 
+        'Intervention technique', 'Visite', 'Observation', 'Autre'
+    ];
+    
+    showModal('Modifier entrée', `
+        <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg text-sm">
+                <i class="fas fa-clock mr-1"></i> ${formatDateTime(entree.date)} - ${entree.agent}
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Type *</label>
+                <select id="mcTypeEdit" class="input">
+                    ${typesMainCourante.map(t => `<option value="${t}" ${entree.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <input type="text" id="mcLocalisationEdit" class="input" value="${entree.localisation || ''}" placeholder="Ex: Hall d'entrée, Parking...">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description *</label>
+                <textarea id="mcDescriptionEdit" class="input" rows="4">${entree.description}</textarea>
+            </div>
+        </div>
+    `, () => {
+        const description = document.getElementById('mcDescriptionEdit').value.trim();
+        
+        if (!description) {
+            showToast('Entrez une description', 'error');
+            return;
+        }
+        
+        entree.type = document.getElementById('mcTypeEdit').value;
+        entree.localisation = document.getElementById('mcLocalisationEdit').value.trim();
+        entree.description = description;
+        entree.modifiePar = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système';
+        entree.dateModification = new Date().toISOString();
+        
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Entrée modifiée');
+        navigate('mainCourante');
+    });
+}
+
+function supprimerEntreeMainCourante(id) {
+    showConfirm('Supprimer cette entrée de la main courante ?', () => {
+        DB.mainCourante = DB.mainCourante.filter(m => String(m.id) !== String(id));
+        sauvegarderVersFirebase();
+        showToast('🗑️ Entrée supprimée');
+        navigate('mainCourante');
+    });
+}
+
 // ========== ÉVÉNEMENTS ==========
-const typesEvt = ['Alarme Incendie', 'Secours à personne', 'Problème technique', 'Incident', 'Anomalie'];
+const typesEvt = ['Alarme Incendie', 'Secours à personne', 'Problème technique', 'Incident', 'Intrusion', 'Incivilité', 'Anomalie', 'Autre'];
 
 function renderEvenements() {
     const evtsActifs = DB.evenements.filter(e => e.statut !== 'Terminé');
     const evtsTermines = DB.evenements.filter(e => e.statut === 'Terminé');
+    const canEdit = currentUser?.qualification !== 'SSIAP 1';
 
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -2206,46 +2358,90 @@ function renderEvenements() {
         </div>
 
         <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="stat-card bg-red-50"><div class="text-2xl font-bold text-red-600">${DB.evenements.filter(e => e.statut === 'Début').length}</div><div class="text-xs">Alertes</div></div>
-            <div class="stat-card bg-orange-50"><div class="text-2xl font-bold text-orange-600">${DB.evenements.filter(e => e.statut === 'En cours').length}</div><div class="text-xs">En cours</div></div>
-            <div class="stat-card bg-green-50"><div class="text-2xl font-bold text-green-600">${evtsTermines.length}</div><div class="text-xs">Terminés</div></div>
+            <div class="stat-card bg-red-50 dark:bg-red-900/30 cursor-pointer hover:ring-2 hover:ring-red-400" onclick="filtrerEvenements('Début')">
+                <div class="text-2xl font-bold text-red-600">${DB.evenements.filter(e => e.statut === 'Début').length}</div>
+                <div class="text-xs text-red-600">🔴 Alertes</div>
+            </div>
+            <div class="stat-card bg-orange-50 dark:bg-orange-900/30 cursor-pointer hover:ring-2 hover:ring-orange-400" onclick="filtrerEvenements('En cours')">
+                <div class="text-2xl font-bold text-orange-600">${DB.evenements.filter(e => e.statut === 'En cours').length}</div>
+                <div class="text-xs text-orange-600">🟠 En cours</div>
+            </div>
+            <div class="stat-card bg-green-50 dark:bg-green-900/30 cursor-pointer hover:ring-2 hover:ring-green-400" onclick="filtrerEvenements('Terminé')">
+                <div class="text-2xl font-bold text-green-600">${evtsTermines.length}</div>
+                <div class="text-xs text-green-600">🟢 Terminés</div>
+            </div>
         </div>
 
         ${evtsActifs.length ? `
         <div class="card mb-6">
-            <div class="gradient-danger text-white p-4 font-semibold">Événements actifs</div>
+            <div class="gradient-danger text-white p-4 font-semibold flex items-center gap-2">
+                <span class="status-dot red"></span>
+                Événements actifs (${evtsActifs.length})
+            </div>
             <div class="p-4 space-y-3">
                 ${evtsActifs.map(e => {
                     const agent = DB.agents.find(a => a.id === e.agentId);
+                    const statusColor = e.statut === 'Début' ? 'red' : 'orange';
+                    const badgeClass = e.statut === 'Début' ? 'badge-danger' : 'badge-warning';
                     return `
-                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
+                        <div class="flex items-center justify-between p-4 bg-${statusColor}-50 dark:bg-${statusColor}-900/20 rounded-xl border-l-4 border-${statusColor}-500">
                             <div class="flex items-center gap-4">
-                                <span class="status-dot ${getStatusColor(e.statut)}"></span>
+                                <span class="status-dot ${statusColor}"></span>
                                 <div>
-                                    <div class="font-semibold">${e.type}</div>
-                                    <div class="text-sm text-gray-500">${e.localisation || ''} • ${formatDateTime(e.date)}</div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="font-semibold">${e.type}</span>
+                                        <span class="badge ${badgeClass}">${e.statut}</span>
+                                    </div>
+                                    ${e.localisation ? `<div class="text-sm text-gray-600"><i class="fas fa-map-marker-alt mr-1 text-${statusColor}-500"></i>${e.localisation}</div>` : ''}
+                                    <div class="text-sm text-gray-500">${agent?.prenom || ''} ${agent?.nom || ''} • ${formatDateTime(e.date)}</div>
+                                    <div class="text-sm mt-1">${e.description.substring(0, 100)}${e.description.length > 100 ? '...' : ''}</div>
                                 </div>
                             </div>
-                            <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
+                            <div class="flex gap-2">
+                                ${canEdit ? `<button onclick="modifierEvenement(${e.id})" class="btn btn-secondary btn-sm" title="Modifier"><i class="fas fa-edit"></i></button>` : ''}
+                                <button onclick="voirEvenement(${e.id})" class="btn btn-primary btn-sm"><i class="fas fa-eye"></i> Voir</button>
+                            </div>
                         </div>
                     `;
                 }).join('')}
             </div>
         </div>
-        ` : ''}
+        ` : `
+        <div class="card mb-6 p-8 text-center">
+            <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
+            <h3 class="text-lg font-semibold text-green-600">Aucun événement actif</h3>
+            <p class="text-gray-500">Tous les événements sont clôturés</p>
+        </div>
+        `}
 
         <div class="card">
-            <div class="gradient-success text-white p-4 font-semibold">Événements terminés</div>
+            <div class="gradient-success text-white p-4 font-semibold flex items-center gap-2">
+                <i class="fas fa-check-circle"></i>
+                Événements terminés (${evtsTermines.length})
+            </div>
             <div class="p-4">
-                ${evtsTermines.length ? evtsTermines.slice(0, 10).map(e => `
-                    <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                        <div>
-                            <div class="font-medium">${e.type}</div>
-                            <div class="text-sm text-gray-500">${formatDateTime(e.date)}</div>
+                ${evtsTermines.length ? evtsTermines.slice(0, 20).map(e => {
+                    const agent = DB.agents.find(a => a.id === e.agentId);
+                    return `
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg border-b border-gray-100 dark:border-slate-700 last:border-0">
+                            <div class="flex items-center gap-3">
+                                <span class="status-dot green"></span>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium">${e.type}</span>
+                                        <span class="badge badge-success">Terminé</span>
+                                    </div>
+                                    ${e.localisation ? `<div class="text-xs text-gray-500"><i class="fas fa-map-marker-alt mr-1"></i>${e.localisation}</div>` : ''}
+                                    <div class="text-sm text-gray-500">${formatDateTime(e.date)}</div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                ${canEdit ? `<button onclick="modifierEvenement(${e.id})" class="btn btn-secondary btn-sm" title="Modifier"><i class="fas fa-edit"></i></button>` : ''}
+                                <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
+                            </div>
                         </div>
-                        <button onclick="voirEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-eye"></i></button>
-                    </div>
-                `).join('') : '<p class="text-gray-500 text-center py-4">Aucun</p>'}
+                    `;
+                }).join('') : '<p class="text-gray-500 text-center py-4">Aucun événement terminé</p>'}
             </div>
         </div>
     `;
@@ -2253,60 +2449,331 @@ function renderEvenements() {
 
 function showModalEvenement() {
     const agentsPoste = getAgentsEnPoste();
+    
+    // Générer les options de localisation basées sur l'établissement
+    let localisationOptions = '<option value="">Sélectionner...</option>';
+    configEtablissement.batiments.forEach(bat => {
+        localisationOptions += `<optgroup label="${bat.nom}">`;
+        bat.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                localisationOptions += `<option value="${bat.nom} > ${sect.nom} > ${zone}">${sect.nom} - ${zone}</option>`;
+            });
+        });
+        localisationOptions += '</optgroup>';
+    });
+    localisationOptions += '<option value="Autre">Autre (préciser)</option>';
+    
     showModal('Nouvel Événement', `
         <div class="space-y-4">
-            <div><label class="block text-sm font-semibold mb-2">Type</label><select id="evtType" class="input">${typesEvt.map(t => `<option>${t}</option>`).join('')}</select></div>
-            <div><label class="block text-sm font-semibold mb-2">Agent</label><select id="evtAgent" class="input">${agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('')}</select></div>
-            <div><label class="block text-sm font-semibold mb-2">Localisation</label><input type="text" id="evtLoc" class="input" placeholder="Ex: Hall"></div>
-            <div><label class="block text-sm font-semibold mb-2">Description</label><textarea id="evtDesc" class="input" rows="3"></textarea></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-exclamation-triangle mr-1 text-red-500"></i>Type *</label>
+                    <select id="evtType" class="input">
+                        ${typesEvt.map(t => `<option>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2"><i class="fas fa-user mr-1"></i>Agent *</label>
+                    <select id="evtAgent" class="input">
+                        ${agentsPoste.length ? agentsPoste.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('') : `<option value="${currentUser?.id}">${currentUser?.prenom} ${currentUser?.nom}</option>`}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-map-marker-alt mr-1 text-blue-500"></i>Localisation *</label>
+                <select id="evtLocSelect" class="input mb-2" onchange="toggleEvtLocAutre()">
+                    ${localisationOptions}
+                </select>
+                <input type="text" id="evtLocAutre" class="input hidden" placeholder="Précisez la localisation...">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-align-left mr-1"></i>Description *</label>
+                <textarea id="evtDesc" class="input" rows="4" placeholder="Décrivez l'événement en détail..."></textarea>
+            </div>
+            <div class="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg text-sm">
+                <i class="fas fa-info-circle text-red-500 mr-1"></i>
+                L'événement sera créé avec le statut <strong class="text-red-600">"Début"</strong> (alerte rouge)
+            </div>
         </div>
     `, () => {
-        const desc = document.getElementById('evtDesc').value;
+        const desc = document.getElementById('evtDesc').value.trim();
+        const locSelect = document.getElementById('evtLocSelect').value;
+        const locAutre = document.getElementById('evtLocAutre').value.trim();
+        const localisation = locSelect === 'Autre' ? locAutre : locSelect;
+        
         if (!desc) return showToast('Entrez une description', 'error');
+        if (!localisation) return showToast('Précisez la localisation', 'error');
 
         const evt = {
             id: genId(),
             type: document.getElementById('evtType').value,
             statut: 'Début',
             agentId: parseInt(document.getElementById('evtAgent').value),
-            localisation: document.getElementById('evtLoc').value,
+            localisation: localisation,
             description: desc,
             date: new Date().toISOString(),
             suivis: []
         };
+        
         DB.evenements.unshift(evt);
-        addMainCourante(evt.type, `DÉBUT: ${desc}`, evt.agentId);
+        addMainCourante(evt.type, `🔴 DÉBUT: ${desc}`, evt.agentId, { localisation: localisation, statut: 'Début' });
         sauvegarderVersFirebase();
         closeModal();
-        showToast('Événement créé');
+        showToast('🚨 Événement créé');
         navigate('evenements');
     });
+}
+
+function toggleEvtLocAutre() {
+    const select = document.getElementById('evtLocSelect');
+    const autre = document.getElementById('evtLocAutre');
+    if (select.value === 'Autre') {
+        autre.classList.remove('hidden');
+        autre.focus();
+    } else {
+        autre.classList.add('hidden');
+    }
+}
+
+function modifierEvenement(id) {
+    const e = DB.evenements.find(x => x.id === id);
+    if (!e) return;
+    
+    const agent = DB.agents.find(a => a.id === e.agentId);
+    const agentsPoste = getAgentsEnPoste();
+    
+    // Options de localisation
+    let localisationOptions = '<option value="">Sélectionner...</option>';
+    configEtablissement.batiments.forEach(bat => {
+        localisationOptions += `<optgroup label="${bat.nom}">`;
+        bat.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                const val = `${bat.nom} > ${sect.nom} > ${zone}`;
+                localisationOptions += `<option value="${val}" ${e.localisation === val ? 'selected' : ''}>${sect.nom} - ${zone}</option>`;
+            });
+        });
+        localisationOptions += '</optgroup>';
+    });
+    
+    // Vérifier si la localisation actuelle est "Autre"
+    const isAutreLoc = e.localisation && !localisationOptions.includes(`value="${e.localisation}"`);
+    if (isAutreLoc) {
+        localisationOptions += `<option value="Autre" selected>Autre (préciser)</option>`;
+    } else {
+        localisationOptions += '<option value="Autre">Autre (préciser)</option>';
+    }
+    
+    const statutOptions = ['Début', 'En cours', 'Terminé'];
+    
+    showModal('Modifier Événement', `
+        <div class="space-y-4">
+            <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg text-sm">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="status-dot ${getStatusColor(e.statut)}"></span>
+                    <strong>${e.type}</strong>
+                </div>
+                <div class="text-gray-500">Créé le ${formatDateTime(e.date)} par ${agent?.prenom || ''} ${agent?.nom || ''}</div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Type *</label>
+                    <select id="evtTypeEdit" class="input">
+                        ${typesEvt.map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Statut *</label>
+                    <select id="evtStatutEdit" class="input" onchange="toggleEvtCompteRendu()">
+                        ${statutOptions.map(s => {
+                            const color = s === 'Début' ? '🔴' : s === 'En cours' ? '🟠' : '🟢';
+                            return `<option value="${s}" ${e.statut === s ? 'selected' : ''}>${color} ${s}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-map-marker-alt mr-1"></i>Localisation *</label>
+                <select id="evtLocSelectEdit" class="input mb-2" onchange="toggleEvtLocAutreEdit()">
+                    ${localisationOptions}
+                </select>
+                <input type="text" id="evtLocAutreEdit" class="input ${isAutreLoc ? '' : 'hidden'}" value="${isAutreLoc ? e.localisation : ''}" placeholder="Précisez la localisation...">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-2">Description *</label>
+                <textarea id="evtDescEdit" class="input" rows="3">${e.description}</textarea>
+            </div>
+            
+            <div id="evtCompteRenduSection" class="${e.statut === 'Terminé' ? '' : 'hidden'}">
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-file-alt mr-1 text-green-500"></i>Compte-rendu de clôture</label>
+                <textarea id="evtCompteRenduEdit" class="input" rows="3" placeholder="Résumé des actions menées...">${e.compteRendu || ''}</textarea>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-comment mr-1"></i>Ajouter un suivi</label>
+                <textarea id="evtSuiviNouveau" class="input" rows="2" placeholder="Nouveau commentaire de suivi..."></textarea>
+            </div>
+            
+            ${e.suivis?.length ? `
+            <div class="border-t pt-4">
+                <div class="text-sm font-semibold mb-2">Historique des suivis (${e.suivis.length})</div>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                    ${e.suivis.map(s => `
+                        <div class="bg-gray-50 dark:bg-slate-700 p-2 rounded text-sm">
+                            <div class="text-xs text-gray-500">${formatDateTime(s.date)} - ${s.agent}</div>
+                            <div>${s.texte}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `, () => {
+        const desc = document.getElementById('evtDescEdit').value.trim();
+        const locSelect = document.getElementById('evtLocSelectEdit').value;
+        const locAutre = document.getElementById('evtLocAutreEdit').value.trim();
+        const localisation = locSelect === 'Autre' ? locAutre : locSelect;
+        const nouveauStatut = document.getElementById('evtStatutEdit').value;
+        const nouveauSuivi = document.getElementById('evtSuiviNouveau').value.trim();
+        const compteRendu = document.getElementById('evtCompteRenduEdit')?.value?.trim();
+        
+        if (!desc) return showToast('Entrez une description', 'error');
+        if (!localisation) return showToast('Précisez la localisation', 'error');
+        if (nouveauStatut === 'Terminé' && !compteRendu && !e.compteRendu) {
+            return showToast('Rédigez un compte-rendu pour clôturer', 'error');
+        }
+        
+        const ancienStatut = e.statut;
+        e.type = document.getElementById('evtTypeEdit').value;
+        e.statut = nouveauStatut;
+        e.localisation = localisation;
+        e.description = desc;
+        
+        if (compteRendu) {
+            e.compteRendu = compteRendu;
+        }
+        
+        if (nouveauStatut === 'Terminé' && ancienStatut !== 'Terminé') {
+            e.dateCloture = new Date().toISOString();
+        }
+        
+        // Ajouter le suivi si présent
+        if (nouveauSuivi) {
+            if (!e.suivis) e.suivis = [];
+            e.suivis.unshift({
+                id: genId(),
+                date: new Date().toISOString(),
+                agent: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+                texte: nouveauSuivi
+            });
+        }
+        
+        e.modifiePar = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système';
+        e.dateModification = new Date().toISOString();
+        
+        // Log dans la main courante si changement de statut
+        if (ancienStatut !== nouveauStatut) {
+            const emoji = nouveauStatut === 'Début' ? '🔴' : nouveauStatut === 'En cours' ? '🟠' : '🟢';
+            addMainCourante(e.type, `${emoji} ${nouveauStatut.toUpperCase()}: ${desc.substring(0, 50)}...`, currentUser?.id, { localisation: localisation, statut: nouveauStatut });
+        }
+        
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Événement modifié');
+        navigate('evenements');
+    });
+}
+
+function toggleEvtLocAutreEdit() {
+    const select = document.getElementById('evtLocSelectEdit');
+    const autre = document.getElementById('evtLocAutreEdit');
+    if (select.value === 'Autre') {
+        autre.classList.remove('hidden');
+        autre.focus();
+    } else {
+        autre.classList.add('hidden');
+    }
+}
+
+function toggleEvtCompteRendu() {
+    const statut = document.getElementById('evtStatutEdit').value;
+    const section = document.getElementById('evtCompteRenduSection');
+    if (statut === 'Terminé') {
+        section.classList.remove('hidden');
+    } else {
+        section.classList.add('hidden');
+    }
 }
 
 function voirEvenement(id) {
     const e = DB.evenements.find(x => x.id === id);
     if (!e) return;
     const agent = DB.agents.find(a => a.id === e.agentId);
+    const statusColor = e.statut === 'Début' ? 'red' : e.statut === 'En cours' ? 'orange' : 'green';
+    const badgeClass = e.statut === 'Début' ? 'badge-danger' : e.statut === 'En cours' ? 'badge-warning' : 'badge-success';
+    const canEdit = currentUser?.qualification !== 'SSIAP 1';
 
-    showModal('Événement', `
+    showModal('Détails Événement', `
         <div class="space-y-4">
             <div class="flex items-center gap-4">
-                <span class="status-dot ${getStatusColor(e.statut)}" style="width:20px;height:20px;"></span>
+                <span class="status-dot ${statusColor}" style="width:24px;height:24px;"></span>
                 <div>
                     <div class="text-xl font-bold">${e.type}</div>
-                    <span class="badge badge-${e.statut === 'Terminé' ? 'success' : 'warning'}">${e.statut}</span>
+                    <span class="badge ${badgeClass}">${e.statut}</span>
                 </div>
             </div>
+            
+            ${e.localisation ? `
+            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-xl flex items-center gap-2">
+                <i class="fas fa-map-marker-alt text-blue-500"></i>
+                <span class="font-medium">${e.localisation}</span>
+            </div>
+            ` : ''}
+            
             <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
+                <div class="font-semibold mb-2">Description</div>
                 <p>${e.description}</p>
             </div>
-            <div class="text-sm text-gray-500">
-                <div>Agent: ${agent?.prenom} ${agent?.nom}</div>
-                <div>Date: ${formatDateTime(e.date)}</div>
-                <div>Localisation: ${e.localisation || '-'}</div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Agent</div>
+                    <div class="font-medium">${agent?.prenom || ''} ${agent?.nom || ''}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Date</div>
+                    <div class="font-medium">${formatDateTime(e.date)}</div>
+                </div>
             </div>
+            
+            ${e.compteRendu ? `
+            <div class="bg-green-50 dark:bg-green-900/30 p-4 rounded-xl">
+                <div class="font-semibold text-green-700 mb-2"><i class="fas fa-check-circle mr-1"></i>Compte-rendu</div>
+                <p class="text-sm">${e.compteRendu}</p>
+                ${e.dateCloture ? `<div class="text-xs text-green-600 mt-2">Clôturé le ${formatDateTime(e.dateCloture)}</div>` : ''}
+            </div>
+            ` : ''}
+            
+            ${e.suivis?.length ? `
+            <div class="border-t pt-4">
+                <div class="font-semibold mb-3"><i class="fas fa-history mr-1"></i>Suivis (${e.suivis.length})</div>
+                <div class="timeline">
+                    ${e.suivis.map((s, i) => `
+                        <div class="timeline-item ${i === 0 ? 'first' : ''}">
+                            <div class="text-xs text-gray-500">${formatDateTime(s.date)} - ${s.agent}</div>
+                            <div class="text-sm">${s.texte}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            
             ${e.statut !== 'Terminé' ? `
                 <div class="flex gap-2 pt-4 border-t">
+                    ${canEdit ? `<button onclick="closeModal(); modifierEvenement(${e.id})" class="btn btn-secondary flex-1"><i class="fas fa-edit"></i> Modifier</button>` : ''}
+                    <button onclick="closeModal(); passerEnCours(${e.id})" class="btn btn-warning flex-1 ${e.statut === 'En cours' ? 'hidden' : ''}"><i class="fas fa-play"></i> En cours</button>
                     <button onclick="closeModal(); terminerEvenement(${e.id})" class="btn btn-success flex-1"><i class="fas fa-check"></i> Terminer</button>
                 </div>
             ` : ''}
@@ -2314,250 +2781,57 @@ function voirEvenement(id) {
     `, null, 'Fermer');
 }
 
+function passerEnCours(id) {
+    const e = DB.evenements.find(x => x.id === id);
+    if (!e) return;
+    
+    e.statut = 'En cours';
+    addMainCourante(e.type, `🟠 EN COURS: ${e.description.substring(0, 50)}...`, currentUser?.id, { localisation: e.localisation, statut: 'En cours' });
+    sauvegarderVersFirebase();
+    showToast('🟠 Événement en cours');
+    navigate('evenements');
+}
+
 function terminerEvenement(id) {
     const e = DB.evenements.find(x => x.id === id);
     if (!e) return;
 
-    showModal('Terminer', `
+    showModal('Terminer l\'événement', `
         <div class="space-y-4">
-            <div><label class="block text-sm font-semibold mb-2">Compte-rendu</label><textarea id="crTexte" class="input" rows="4"></textarea></div>
+            <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                <div class="font-semibold">${e.type}</div>
+                <div class="text-sm text-gray-500">${e.localisation || ''}</div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2"><i class="fas fa-file-alt mr-1 text-green-500"></i>Compte-rendu de clôture *</label>
+                <textarea id="crTexte" class="input" rows="5" placeholder="Décrivez les actions menées et la résolution..."></textarea>
+            </div>
         </div>
     `, () => {
-        const cr = document.getElementById('crTexte').value;
+        const cr = document.getElementById('crTexte').value.trim();
         if (!cr) return showToast('Rédigez le compte-rendu', 'error');
 
         e.statut = 'Terminé';
         e.compteRendu = cr;
         e.dateCloture = new Date().toISOString();
-        addMainCourante('Événement terminé', `${e.type}: ${cr.substring(0, 100)}...`, currentUser?.id);
+        
+        addMainCourante('Événement terminé', `🟢 TERMINÉ - ${e.type}: ${cr.substring(0, 80)}...`, currentUser?.id, { localisation: e.localisation, statut: 'Terminé' });
         sauvegarderVersFirebase();
         closeModal();
-        showToast('Événement clôturé');
+        showToast('🟢 Événement clôturé');
         navigate('evenements');
     });
 }
 
-// ========== MATÉRIELS ==========
-const typesMat = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'Éclairage', 'BAES', 'Désenfumage', 'Autre'];
-const statutsMat = ['Opérationnel', 'Défaillant', 'En Maintenance', 'Hors Service'];
-
-function renderMateriels() {
-    const stats = { total: DB.materiels.length, ok: 0, defaillant: 0, hs: 0 };
-    DB.materiels.forEach(m => {
-        if (m.statut === 'Opérationnel') stats.ok++;
-        else if (m.statut === 'Défaillant') stats.defaillant++;
-        else if (m.statut === 'Hors Service') stats.hs++;
-    });
-
-    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
-    const canCreate = currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
-
-    return `
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h1 class="text-2xl font-bold"><i class="fas fa-fire-extinguisher text-primary-500 mr-2"></i>Matériels</h1>
-            ${canCreate ? '<button onclick="showModalMateriel()" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Nouveau</button>' : ''}
-        </div>
-
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-blue-600">${stats.total}</div><div class="text-xs">Total</div></div>
-            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-green-600">${stats.ok}</div><div class="text-xs">Opérationnels</div></div>
-            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-orange-600">${stats.defaillant}</div><div class="text-xs">Défaillants</div></div>
-            <div class="stat-card bg-white dark:bg-slate-800"><div class="text-2xl font-bold text-red-600">${stats.hs}</div><div class="text-xs">Hors Service</div></div>
-        </div>
-
-        <div class="card">
-            <div class="overflow-x-auto">
-                <table class="table">
-                    <thead><tr><th>Nom</th><th>Localisation</th><th>État</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        ${DB.materiels.map(m => {
-                            const sClass = { 'Opérationnel': 'success', 'Défaillant': 'warning', 'En Maintenance': 'info', 'Hors Service': 'danger' }[m.statut] || 'secondary';
-                            return `
-                                <tr>
-                                    <td>
-                                        <div class="font-semibold">${m.nom}</div>
-                                        <div class="text-sm text-gray-500">${m.type}</div>
-                                    </td>
-                                    <td class="text-gray-600">${m.localisation || '-'}</td>
-                                    <td><span class="badge badge-${sClass}">${m.statut}</span></td>
-                                    <td>
-                                        <button onclick="voirMateriel(${m.id})" class="btn btn-icon btn-sm btn-secondary"><i class="fas fa-eye"></i></button>
-                                        ${!isSsiap1 ? `<button onclick="editMat(${m.id})" class="btn btn-icon btn-sm btn-primary"><i class="fas fa-edit"></i></button>` : ''}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
-function showModalMateriel() {
-    const batimentsOptions = configEtablissement.batiments.map(b => `<option value="${b.id}">${b.nom}</option>`).join('');
-
-    showModal('Nouveau Matériel', `
-        <div class="space-y-4">
-            <div class="grid grid-cols-3 gap-3">
-                <div><label class="block text-xs mb-1">Bâtiment</label><select id="matBatiment" class="input" onchange="updateSecteursMat()"><option value="">Choisir...</option>${batimentsOptions}</select></div>
-                <div><label class="block text-xs mb-1">Secteur</label><select id="matSecteur" class="input" onchange="updateZonesMat()" disabled><option value="">Choisir...</option></select></div>
-                <div><label class="block text-xs mb-1">Zone</label><select id="matZone" class="input" disabled><option value="">Choisir...</option></select></div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Type</label><select id="matType" class="input">${typesMat.map(t => `<option>${t}</option>`).join('')}</select></div>
-                <div><label class="block text-sm font-semibold mb-2">Numéro</label><input type="text" id="matNumero" class="input" placeholder="001"></div>
-            </div>
-            <div><label class="block text-sm font-semibold mb-2">Nom</label><input type="text" id="matNom" class="input" placeholder="Nom du matériel"></div>
-            <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="matStatut" class="input">${statutsMat.map(s => `<option>${s}</option>`).join('')}</select></div>
-        </div>
-    `, () => {
-        const nom = document.getElementById('matNom').value;
-        const batimentId = document.getElementById('matBatiment').value;
-        const secteurId = document.getElementById('matSecteur').value;
-        const zone = document.getElementById('matZone').value;
-
-        if (!nom || !batimentId || !secteurId || !zone) {
-            showToast('Remplissez tous les champs', 'error');
-            return;
-        }
-
-        const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
-        const secteur = batiment?.secteurs.find(s => s.id === secteurId);
-        const localisation = `${batiment?.nom} > ${secteur?.nom} > ${zone}`;
-
-        DB.materiels.push({
-            id: genId(),
-            nom,
-            type: document.getElementById('matType').value,
-            statut: document.getElementById('matStatut').value,
-            localisation,
-            batimentId,
-            secteurId,
-            zone,
-            codeQR: `MAT-${Date.now()}`,
-            dateCreation: new Date().toISOString()
-        });
-
-        addMainCourante('Matériel', `Création: ${nom}`, currentUser?.id);
-        sauvegarderVersFirebase();
-        closeModal();
-        showToast('Matériel créé');
-        navigate('materiels');
-    });
-}
-
-function updateSecteursMat() {
-    const batimentId = document.getElementById('matBatiment').value;
-    const secteurSelect = document.getElementById('matSecteur');
-    const zoneSelect = document.getElementById('matZone');
-
-    secteurSelect.innerHTML = '<option value="">Choisir...</option>';
-    zoneSelect.innerHTML = '<option value="">Choisir...</option>';
-    zoneSelect.disabled = true;
-
-    if (!batimentId) {
-        secteurSelect.disabled = true;
-        return;
-    }
-
-    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
-    if (batiment) {
-        batiment.secteurs.forEach(s => {
-            secteurSelect.innerHTML += `<option value="${s.id}">${s.nom}</option>`;
-        });
-        secteurSelect.disabled = false;
-    }
-}
-
-function updateZonesMat() {
-    const batimentId = document.getElementById('matBatiment').value;
-    const secteurId = document.getElementById('matSecteur').value;
-    const zoneSelect = document.getElementById('matZone');
-
-    zoneSelect.innerHTML = '<option value="">Choisir...</option>';
-
-    if (!secteurId) {
-        zoneSelect.disabled = true;
-        return;
-    }
-
-    const batiment = configEtablissement.batiments.find(b => b.id === batimentId);
-    const secteur = batiment?.secteurs.find(s => s.id === secteurId);
-
-    if (secteur) {
-        secteur.zones.forEach(z => {
-            zoneSelect.innerHTML += `<option value="${z}">${z}</option>`;
-        });
-        zoneSelect.disabled = false;
-    }
-}
-
-function voirMateriel(id) {
-    const m = DB.materiels.find(x => x.id === id);
-    if (!m) return;
-
-    const sClass = { 'Opérationnel': 'success', 'Défaillant': 'warning', 'En Maintenance': 'info', 'Hors Service': 'danger' }[m.statut] || 'secondary';
-
-    showModal('Fiche Matériel', `
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="text-xl font-bold">${m.nom}</h3>
-                <span class="badge badge-${sClass}">${m.statut}</span>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Type</div><div class="font-medium">${m.type}</div></div>
-                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg"><div class="text-xs text-gray-500">Localisation</div><div class="font-medium">${m.localisation || '-'}</div></div>
-            </div>
-            ${m.observation ? `<div class="bg-yellow-50 p-3 rounded-lg"><div class="text-xs text-yellow-600">Observation</div><div class="text-sm">${m.observation}</div></div>` : ''}
-        </div>
-    `, null, 'Fermer');
-}
-
-function editMat(id) {
-    const m = DB.materiels.find(x => x.id === id);
-    if (!m) return;
-
-    showModal('Modifier Matériel', `
-        <div class="space-y-4">
-            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl">
-                <div class="font-bold">${m.nom}</div>
-                <div class="text-sm text-gray-500">${m.localisation}</div>
-            </div>
-            <div><label class="block text-sm font-semibold mb-2">Statut</label><select id="editMatStatut" class="input">${statutsMat.map(s => `<option ${m.statut === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
-            <div><label class="block text-sm font-semibold mb-2">Observation</label><textarea id="editMatObs" class="input" rows="3">${m.observation || ''}</textarea></div>
-        </div>
-    `, () => {
-        const ancienStatut = m.statut;
-        m.statut = document.getElementById('editMatStatut').value;
-        m.observation = document.getElementById('editMatObs').value;
-
-        if (m.statut === 'Hors Service' && ancienStatut !== 'Hors Service') {
-            DB.consignes.push({
-                id: genId(),
-                titre: `${m.nom} - HORS SERVICE`,
-                niveau: 'Particulière',
-                destinataire: 'Tout le monde',
-                priorite: 'Haute',
-                contenu: `⚠️ MATÉRIEL HORS SERVICE\n\nLocalisation: ${m.localisation}\n\n${m.observation || ''}`,
-                dateDebut: new Date().toISOString().split('T')[0],
-                dateFin: null,
-                active: true,
-                materielId: m.id
-            });
-        }
-
-        addMainCourante('Matériel', `Modification: ${m.nom} - ${m.statut}`, currentUser?.id);
-        sauvegarderVersFirebase();
-        closeModal();
-        showToast('Matériel modifié');
-        navigate('materiels');
-    });
+function filtrerEvenements(statut) {
+    // Pour l'instant, juste un toast - on pourrait ajouter un vrai filtre
+    showToast(`Filtre: ${statut}`, 'info');
 }
 
 // ========== CONSIGNES ==========
 const niveauxConsigne = ['Courante', 'Particulière'];
 const destinataires = ['Tout le monde', 'Chef de poste', 'Chef de service'];
+const prioritesConsigne = ['Basse', 'Normale', 'Haute', 'Urgente'];
 
 function renderConsignes() {
     const filteredConsignes = DB.consignes.filter(c => {
@@ -2567,38 +2841,108 @@ function renderConsignes() {
         return false;
     });
 
-    const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
+    // SSIAP 2 (Chef de poste) et SSIAP 3 (Superviseur) peuvent gérer les consignes
+    const canManage = currentUser?.qualification === 'SSIAP 2' || currentUser?.qualification === 'SSIAP 3' || currentUser?.qualification === 'Administrateur';
+
+    const consignesParticulieres = filteredConsignes.filter(c => c.niveau === 'Particulière' && c.active);
+    const consignesCourantes = filteredConsignes.filter(c => c.niveau === 'Courante' && c.active);
+    const consignesInactives = filteredConsignes.filter(c => !c.active);
 
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2 text-primary-500"></i>Consignes</h1>
-            ${!isSsiap1 ? '<button onclick="showModalConsigne()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle</button>' : ''}
+            ${canManage ? '<button onclick="showModalConsigne()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle consigne</button>' : ''}
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="stat-card bg-orange-50 dark:bg-orange-900/30">
+                <div class="text-2xl font-bold text-orange-600">${consignesParticulieres.length}</div>
+                <div class="text-xs text-orange-600">Particulières</div>
+            </div>
+            <div class="stat-card bg-blue-50 dark:bg-blue-900/30">
+                <div class="text-2xl font-bold text-blue-600">${consignesCourantes.length}</div>
+                <div class="text-xs text-blue-600">Courantes</div>
+            </div>
+            <div class="stat-card bg-gray-50 dark:bg-gray-700">
+                <div class="text-2xl font-bold text-gray-600">${consignesInactives.length}</div>
+                <div class="text-xs text-gray-500">Archivées</div>
+            </div>
         </div>
 
         <div class="grid lg:grid-cols-2 gap-6">
             <div class="card">
-                <div class="gradient-warning text-white p-4 font-semibold">Consignes Particulières</div>
+                <div class="gradient-warning text-white p-4 font-semibold flex items-center justify-between">
+                    <span><i class="fas fa-exclamation-circle mr-2"></i>Consignes Particulières</span>
+                    <span class="bg-white/20 px-2 py-1 rounded text-sm">${consignesParticulieres.length}</span>
+                </div>
                 <div class="p-4 space-y-3">
-                    ${filteredConsignes.filter(c => c.niveau === 'Particulière' && c.active).map(c => `
-                        <div class="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-xl">
-                            <div class="font-semibold">${c.titre}</div>
-                            <p class="text-sm text-gray-600 mt-1">${c.contenu.substring(0, 100)}...</p>
-                        </div>
-                    `).join('') || '<p class="text-gray-500 text-center py-4">Aucune</p>'}
+                    ${consignesParticulieres.length ? consignesParticulieres.map(c => renderConsigneCard(c, canManage, 'orange')).join('') : '<p class="text-gray-500 text-center py-4">Aucune consigne particulière</p>'}
                 </div>
             </div>
 
             <div class="card">
-                <div class="gradient-info text-white p-4 font-semibold">Consignes Courantes</div>
+                <div class="gradient-info text-white p-4 font-semibold flex items-center justify-between">
+                    <span><i class="fas fa-info-circle mr-2"></i>Consignes Courantes</span>
+                    <span class="bg-white/20 px-2 py-1 rounded text-sm">${consignesCourantes.length}</span>
+                </div>
                 <div class="p-4 space-y-3">
-                    ${filteredConsignes.filter(c => c.niveau === 'Courante' && c.active).map(c => `
-                        <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
-                            <div class="font-semibold">${c.titre}</div>
-                            <p class="text-sm text-gray-600 mt-1">${c.contenu.substring(0, 100)}...</p>
-                        </div>
-                    `).join('') || '<p class="text-gray-500 text-center py-4">Aucune</p>'}
+                    ${consignesCourantes.length ? consignesCourantes.map(c => renderConsigneCard(c, canManage, 'blue')).join('') : '<p class="text-gray-500 text-center py-4">Aucune consigne courante</p>'}
                 </div>
             </div>
+        </div>
+
+        ${canManage && consignesInactives.length ? `
+        <div class="card mt-6">
+            <div class="bg-gray-200 dark:bg-gray-700 p-4 font-semibold flex items-center justify-between">
+                <span><i class="fas fa-archive mr-2"></i>Consignes archivées</span>
+                <span class="bg-gray-400/30 px-2 py-1 rounded text-sm">${consignesInactives.length}</span>
+            </div>
+            <div class="p-4 space-y-2">
+                ${consignesInactives.map(c => `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700 rounded-lg opacity-60">
+                        <div>
+                            <div class="font-medium">${c.titre}</div>
+                            <div class="text-sm text-gray-500">${c.niveau} • ${c.destinataire}</div>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="reactiverConsigne(${c.id})" class="btn btn-success btn-sm" title="Réactiver"><i class="fas fa-redo"></i></button>
+                            <button onclick="supprimerConsigne(${c.id})" class="btn btn-danger btn-sm" title="Supprimer"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+    `;
+}
+
+function renderConsigneCard(c, canManage, color) {
+    const prioriteClass = {
+        'Basse': 'badge-success',
+        'Normale': 'badge-info',
+        'Haute': 'badge-warning',
+        'Urgente': 'badge-danger'
+    }[c.priorite] || 'badge-info';
+    
+    return `
+        <div class="p-4 bg-${color}-50 dark:bg-${color}-900/30 rounded-xl border-l-4 border-${color}-500">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="badge ${prioriteClass}">${c.priorite || 'Normale'}</span>
+                    <span class="badge badge-purple">${c.destinataire}</span>
+                </div>
+                ${canManage ? `
+                <div class="flex gap-1">
+                    <button onclick="modifierConsigne(${c.id})" class="btn btn-icon btn-sm btn-secondary" title="Modifier"><i class="fas fa-edit"></i></button>
+                    <button onclick="archiverConsigne(${c.id})" class="btn btn-icon btn-sm btn-warning" title="Archiver"><i class="fas fa-archive"></i></button>
+                    <button onclick="supprimerConsigne(${c.id})" class="btn btn-icon btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+                </div>
+                ` : ''}
+            </div>
+            <div class="font-semibold mb-1">${c.titre}</div>
+            <p class="text-sm text-gray-600 dark:text-gray-400">${c.contenu.substring(0, 150)}${c.contenu.length > 150 ? '...' : ''}</p>
+            ${c.dateFin ? `<div class="text-xs text-gray-500 mt-2"><i class="fas fa-calendar-alt mr-1"></i>Jusqu'au ${formatDate(c.dateFin)}</div>` : ''}
+            <button onclick="voirConsigne(${c.id})" class="text-${color}-600 text-sm mt-2 hover:underline"><i class="fas fa-eye mr-1"></i>Voir détails</button>
         </div>
     `;
 }
@@ -2606,33 +2950,214 @@ function renderConsignes() {
 function showModalConsigne() {
     showModal('Nouvelle Consigne', `
         <div class="space-y-4">
-            <div><label class="block text-sm font-semibold mb-2">Titre</label><input type="text" id="consTitre" class="input"></div>
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">Niveau</label><select id="consNiveau" class="input">${niveauxConsigne.map(n => `<option>${n}</option>`).join('')}</select></div>
-                <div><label class="block text-sm font-semibold mb-2">Destinataire</label><select id="consDest" class="input">${destinataires.map(d => `<option>${d}</option>`).join('')}</select></div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Titre *</label>
+                <input type="text" id="consTitre" class="input" placeholder="Titre de la consigne">
             </div>
-            <div><label class="block text-sm font-semibold mb-2">Contenu</label><textarea id="consContenu" class="input" rows="4"></textarea></div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Niveau *</label>
+                    <select id="consNiveau" class="input">
+                        ${niveauxConsigne.map(n => `<option>${n}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Destinataire *</label>
+                    <select id="consDest" class="input">
+                        ${destinataires.map(d => `<option>${d}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Priorité</label>
+                    <select id="consPriorite" class="input">
+                        ${prioritesConsigne.map(p => `<option ${p === 'Normale' ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Date début</label>
+                    <input type="date" id="consDateDebut" class="input" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Date fin (optionnel)</label>
+                    <input type="date" id="consDateFin" class="input">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Contenu *</label>
+                <textarea id="consContenu" class="input" rows="5" placeholder="Détaillez la consigne..."></textarea>
+            </div>
         </div>
     `, () => {
-        const titre = document.getElementById('consTitre').value;
-        const contenu = document.getElementById('consContenu').value;
-        if (!titre || !contenu) return showToast('Remplissez les champs', 'error');
+        const titre = document.getElementById('consTitre').value.trim();
+        const contenu = document.getElementById('consContenu').value.trim();
+        if (!titre || !contenu) return showToast('Remplissez les champs obligatoires', 'error');
 
-        DB.consignes.push({
+        const consigne = {
             id: genId(),
             titre,
             niveau: document.getElementById('consNiveau').value,
             destinataire: document.getElementById('consDest').value,
-            priorite: 'Normale',
+            priorite: document.getElementById('consPriorite').value,
             contenu,
-            dateDebut: new Date().toISOString().split('T')[0],
-            dateFin: null,
-            active: true
-        });
-
+            dateDebut: document.getElementById('consDateDebut').value,
+            dateFin: document.getElementById('consDateFin').value || null,
+            active: true,
+            creePar: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+            dateCreation: new Date().toISOString()
+        };
+        
+        DB.consignes.push(consigne);
+        addMainCourante('Consigne', `Création: ${titre}`, currentUser?.id);
         sauvegarderVersFirebase();
         closeModal();
-        showToast('Consigne créée');
+        showToast('✅ Consigne créée');
+        navigate('consignes');
+    });
+}
+
+function modifierConsigne(id) {
+    const c = DB.consignes.find(x => x.id === id);
+    if (!c) return;
+
+    showModal('Modifier Consigne', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Titre *</label>
+                <input type="text" id="consTitreEdit" class="input" value="${c.titre}">
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Niveau *</label>
+                    <select id="consNiveauEdit" class="input">
+                        ${niveauxConsigne.map(n => `<option ${c.niveau === n ? 'selected' : ''}>${n}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Destinataire *</label>
+                    <select id="consDestEdit" class="input">
+                        ${destinataires.map(d => `<option ${c.destinataire === d ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Priorité</label>
+                    <select id="consPrioriteEdit" class="input">
+                        ${prioritesConsigne.map(p => `<option ${c.priorite === p ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Date début</label>
+                    <input type="date" id="consDateDebutEdit" class="input" value="${c.dateDebut || ''}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Date fin</label>
+                    <input type="date" id="consDateFinEdit" class="input" value="${c.dateFin || ''}">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Contenu *</label>
+                <textarea id="consContenuEdit" class="input" rows="5">${c.contenu}</textarea>
+            </div>
+        </div>
+    `, () => {
+        const titre = document.getElementById('consTitreEdit').value.trim();
+        const contenu = document.getElementById('consContenuEdit').value.trim();
+        if (!titre || !contenu) return showToast('Remplissez les champs obligatoires', 'error');
+
+        c.titre = titre;
+        c.niveau = document.getElementById('consNiveauEdit').value;
+        c.destinataire = document.getElementById('consDestEdit').value;
+        c.priorite = document.getElementById('consPrioriteEdit').value;
+        c.contenu = contenu;
+        c.dateDebut = document.getElementById('consDateDebutEdit').value;
+        c.dateFin = document.getElementById('consDateFinEdit').value || null;
+        c.modifiePar = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système';
+        c.dateModification = new Date().toISOString();
+
+        addMainCourante('Consigne', `Modification: ${titre}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Consigne modifiée');
+        navigate('consignes');
+    });
+}
+
+function voirConsigne(id) {
+    const c = DB.consignes.find(x => x.id === id);
+    if (!c) return;
+    
+    const prioriteClass = {
+        'Basse': 'badge-success',
+        'Normale': 'badge-info',
+        'Haute': 'badge-warning',
+        'Urgente': 'badge-danger'
+    }[c.priorite] || 'badge-info';
+
+    showModal('Détails Consigne', `
+        <div class="space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="badge ${c.niveau === 'Particulière' ? 'badge-warning' : 'badge-info'}">${c.niveau}</span>
+                <span class="badge ${prioriteClass}">${c.priorite || 'Normale'}</span>
+                <span class="badge badge-purple">${c.destinataire}</span>
+            </div>
+            
+            <h3 class="text-xl font-bold">${c.titre}</h3>
+            
+            <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl whitespace-pre-line">
+                ${c.contenu}
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Date début</div>
+                    <div class="font-medium">${c.dateDebut ? formatDate(c.dateDebut) : '-'}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg">
+                    <div class="text-xs text-gray-500">Date fin</div>
+                    <div class="font-medium">${c.dateFin ? formatDate(c.dateFin) : 'Indéterminée'}</div>
+                </div>
+            </div>
+            
+            ${c.creePar ? `<div class="text-xs text-gray-500">Créée par ${c.creePar} le ${formatDateTime(c.dateCreation)}</div>` : ''}
+            ${c.modifiePar ? `<div class="text-xs text-gray-500">Modifiée par ${c.modifiePar} le ${formatDateTime(c.dateModification)}</div>` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function archiverConsigne(id) {
+    showConfirm('Archiver cette consigne ?', () => {
+        const c = DB.consignes.find(x => x.id === id);
+        if (c) {
+            c.active = false;
+            addMainCourante('Consigne', `Archivée: ${c.titre}`, currentUser?.id);
+            sauvegarderVersFirebase();
+            showToast('📁 Consigne archivée');
+            navigate('consignes');
+        }
+    });
+}
+
+function reactiverConsigne(id) {
+    const c = DB.consignes.find(x => x.id === id);
+    if (c) {
+        c.active = true;
+        addMainCourante('Consigne', `Réactivée: ${c.titre}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        showToast('✅ Consigne réactivée');
+        navigate('consignes');
+    }
+}
+
+function supprimerConsigne(id) {
+    showConfirm('Supprimer définitivement cette consigne ?', () => {
+        const c = DB.consignes.find(x => x.id === id);
+        DB.consignes = DB.consignes.filter(x => x.id !== id);
+        if (c) addMainCourante('Consigne', `Supprimée: ${c.titre}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        showToast('🗑️ Consigne supprimée');
         navigate('consignes');
     });
 }
