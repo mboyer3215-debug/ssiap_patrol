@@ -2101,7 +2101,7 @@ function terminerRondeAvecDetails(id) {
         const agent = DB.agents.find(a => a.id === r.agentId);
         const duree = Math.round((new Date(r.heureFin) - new Date(r.heureDebut)) / 60000);
         const statutLabel = hasHS ? '🔴 HS' : hasAnomalies ? '🟠 Anomalies' : '🟢 OK';
-        addMainCourante('Fin Ronde', `${statusLabel} ${r.type} - ${agent?.prenom} ${agent?.nom} (${pointsValides}/${totalPoints}, ${duree}min)`, r.agentId);
+        addMainCourante('Fin Ronde', `${statutLabel} ${r.type} - ${agent?.prenom} ${agent?.nom} (${pointsValides}/${totalPoints}, ${duree}min)`, r.agentId);
 
         sauvegarderVersFirebase();
         closeModal();
@@ -3944,13 +3944,17 @@ async function convertirEnBase64(file) {
 
 // ========== INITIALISATION ==========
 document.addEventListener('DOMContentLoaded', () => {
+    // Toujours initialiser le login avec les données par défaut d'abord
+    initLogin();
+    
     if (detecterModeRondier()) {
         chargerDepuisFirebase(() => {
+            initLogin(); // Re-init après chargement Firebase
             afficherLoginRondier(false);
         });
     } else {
         chargerDepuisFirebase(() => {
-            initLogin();
+            initLogin(); // Re-init après chargement Firebase
             activerSyncTempsReel();
         });
     }
