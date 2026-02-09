@@ -2755,6 +2755,18 @@ function showModalAgent() {
 let adminTab = 'etablissement';
 
 function renderAdministration() {
+    let content = '';
+    
+    if (adminTab === 'etablissement') {
+        content = renderAdminEtablissement();
+    } else if (adminTab === 'typesRondes') {
+        content = renderAdminTypesRondes();
+    } else if (adminTab === 'qrcodes') {
+        content = renderAdminQRCodes();
+    } else if (adminTab === 'donnees') {
+        content = renderAdminDonnees();
+    }
+
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold"><i class="fas fa-cogs mr-2 text-primary-500"></i>Administration</h1>
@@ -2777,15 +2789,11 @@ function renderAdministration() {
 
         <div class="card">
             <div class="p-6">
-                ${adminTab === 'etablissement' ? renderAdminEtablissement() : ''}
-                ${adminTab === 'typesRondes' ? renderAdminTypesRondes() : ''}
-                ${adminTab === 'qrcodes' ? renderAdminQRCodes() : ''}
-                ${adminTab === 'donnees' ? renderAdminDonnees() : ''}
+                ${content}
             </div>
         </div>
     `;
 }
-
 // ========== ADMIN - ÉTABLISSEMENT (Bâtiments, Secteurs, Zones) ==========
 function renderAdminEtablissement() {
     return `
