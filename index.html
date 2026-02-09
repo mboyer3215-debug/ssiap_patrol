@@ -415,16 +415,25 @@ function chargerDepuisFirebase(callback) {
         .then(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                DB.agents = data.agents || DB.agents;
-                DB.materiels = data.materiels || DB.materiels;
+                // NE PAS écraser si le tableau est vide !
+                if (data.agents && data.agents.length > 0) {
+                    DB.agents = data.agents;
+                }
+                if (data.materiels && data.materiels.length > 0) {
+                    DB.materiels = data.materiels;
+                }
                 DB.prisesPoste = data.prisesPoste || [];
                 DB.rondes = data.rondes || [];
                 DB.evenements = data.evenements || [];
                 DB.mainCourante = data.mainCourante || [];
-                DB.consignes = data.consignes || DB.consignes;
+                if (data.consignes && data.consignes.length > 0) {
+                    DB.consignes = data.consignes;
+                }
                 if (data.configEtablissement) configEtablissement = data.configEtablissement;
                 if (data.typesRondes) typesRondes = data.typesRondes;
-                console.log('✅ Données chargées');
+                console.log('✅ Données chargées depuis Firebase, agents:', DB.agents.length);
+            } else {
+                console.log('⚠️ Pas de données dans Firebase, utilisation des données par défaut');
             }
             donneesChargees = true;
             if (callback) callback();
@@ -435,7 +444,6 @@ function chargerDepuisFirebase(callback) {
             if (callback) callback();
         });
 }
-
 function activerSyncTempsReel() {
     if (!firestoreEnabled || !db) return;
 
