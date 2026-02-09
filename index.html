@@ -2856,6 +2856,245 @@ function filtrerEvenements(statut) {
     showToast(`Filtre: ${statut}`, 'info');
 }
 
+// ========== MATERIELS ==========
+function renderMateriels() {
+    const stats = {
+        total: DB.materiels.length,
+        operationnel: DB.materiels.filter(m => m.statut === 'Opérationnel').length,
+        aVerifier: DB.materiels.filter(m => m.statut === 'À vérifier').length,
+        horsService: DB.materiels.filter(m => m.statut === 'Hors Service' || m.statut === 'En maintenance').length
+    };
+
+    const canEdit = currentUser?.qualification !== 'SSIAP 1';
+
+    return `
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-white"><i class="fas fa-fire-extinguisher mr-2 text-primary-500"></i>Matériels de Sécurité</h1>
+            ${canEdit ? '<button onclick="showModalMateriel()" class="btn btn-primary"><i class="fas fa-plus"></i> Nouveau matériel</button>' : ''}
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="text-2xl font-bold text-blue-600">${stats.total}</div>
+                <div class="text-xs text-gray-500">Total</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="text-2xl font-bold text-green-600">${stats.operationnel}</div>
+                <div class="text-xs text-gray-500">Opérationnels</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="text-2xl font-bold text-orange-600">${stats.aVerifier}</div>
+                <div class="text-xs text-gray-500">À vérifier</div>
+            </div>
+            <div class="stat-card bg-white dark:bg-slate-800">
+                <div class="text-2xl font-bold text-red-600">${stats.horsService}</div>
+                <div class="text-xs text-gray-500">Hors service</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="gradient-header text-white p-4 font-semibold">Liste des matériels</div>
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Matériel</th>
+                            <th>Type</th>
+                            <th>Localisation</th>
+                            <th>Statut</th>
+                            <th>Prochaine maint.</th>
+                            ${canEdit ? '<th>Actions</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${DB.materiels.length ? DB.materiels.map(m => {
+                            const statutClass = m.statut === 'Opérationnel' ? 'badge-success' : 
+                                               m.statut === 'À vérifier' ? 'badge-warning' : 'badge-danger';
+                            return `
+                                <tr>
+                                    <td class="font-medium">${m.nom}</td>
+                                    <td><span class="badge badge-info">${m.type}</span></td>
+                                    <td class="text-sm text-gray-600">${m.localisation || '-'}</td>
+                                    <td><span class="badge ${statutClass}">${m.statut}</span></td>
+                                    <td class="text-sm">${m.prochaineMaint ? formatDate(m.prochaineMaint) : '-'}</td>
+                                    ${canEdit ? `
+                                        <td>
+                                            <div class="flex gap-1">
+                                                <button onclick="modifierMateriel(${m.id})" class="btn btn-icon btn-sm btn-secondary" title="Modifier"><i class="fas fa-edit"></i></button>
+                                                <button onclick="supprimerMateriel(${m.id})" class="btn btn-icon btn-sm btn-danger" title="Supprimer"><i class="fas fa-trash"></i></button>
+                                            </div>
+                                        </td>
+                                    ` : ''}
+                                </tr>
+                            `;
+                        }).join('') : '<tr><td colspan="6" class="text-center py-8 text-gray-500">Aucun matériel enregistré</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function showModalMateriel() {
+    const types = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'BAES', 'Issue de secours', 'Clapet CF', 'Colonne sèche', 'Autre'];
+    const statuts = ['Opérationnel', 'À vérifier', 'En maintenance', 'Hors Service'];
+    
+    // Générer les options de localisation
+    let locOptions = '<option value="">Sélectionner...</option>';
+    configEtablissement.batiments.forEach(bat => {
+        bat.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                locOptions += `<option value="${bat.nom} > ${sect.nom} > ${zone}">${bat.nom} > ${sect.nom} > ${zone}</option>`;
+            });
+        });
+    });
+
+    showModal('Nouveau Matériel', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Nom *</label>
+                <input type="text" id="matNom" class="input" placeholder="Ex: Extincteur CO2 5kg - Hall">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Type *</label>
+                    <select id="matType" class="input">
+                        ${types.map(t => `<option>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Statut</label>
+                    <select id="matStatut" class="input">
+                        ${statuts.map(s => `<option>${s}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <select id="matLoc" class="input">
+                    ${locOptions}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Dernière maintenance</label>
+                    <input type="date" id="matDernMaint" class="input">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Prochaine maintenance</label>
+                    <input type="date" id="matProcMaint" class="input">
+                </div>
+            </div>
+        </div>
+    `, () => {
+        const nom = document.getElementById('matNom').value.trim();
+        if (!nom) return showToast('Entrez un nom', 'error');
+
+        const mat = {
+            id: genId(),
+            nom: nom,
+            type: document.getElementById('matType').value,
+            statut: document.getElementById('matStatut').value,
+            localisation: document.getElementById('matLoc').value,
+            derniereMaint: document.getElementById('matDernMaint').value || null,
+            prochaineMaint: document.getElementById('matProcMaint').value || null
+        };
+
+        DB.materiels.push(mat);
+        addMainCourante('Matériel', `Ajout: ${nom}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Matériel ajouté');
+        navigate('materiels');
+    });
+}
+
+function modifierMateriel(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    const types = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'BAES', 'Issue de secours', 'Clapet CF', 'Colonne sèche', 'Autre'];
+    const statuts = ['Opérationnel', 'À vérifier', 'En maintenance', 'Hors Service'];
+    
+    let locOptions = '<option value="">Sélectionner...</option>';
+    configEtablissement.batiments.forEach(bat => {
+        bat.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                const val = `${bat.nom} > ${sect.nom} > ${zone}`;
+                locOptions += `<option value="${val}" ${m.localisation === val ? 'selected' : ''}>${val}</option>`;
+            });
+        });
+    });
+
+    showModal('Modifier Matériel', `
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold mb-2">Nom *</label>
+                <input type="text" id="matNomEdit" class="input" value="${m.nom}">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Type *</label>
+                    <select id="matTypeEdit" class="input">
+                        ${types.map(t => `<option ${m.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Statut</label>
+                    <select id="matStatutEdit" class="input">
+                        ${statuts.map(s => `<option ${m.statut === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <select id="matLocEdit" class="input">
+                    ${locOptions}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Dernière maintenance</label>
+                    <input type="date" id="matDernMaintEdit" class="input" value="${m.derniereMaint || ''}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Prochaine maintenance</label>
+                    <input type="date" id="matProcMaintEdit" class="input" value="${m.prochaineMaint || ''}">
+                </div>
+            </div>
+        </div>
+    `, () => {
+        const nom = document.getElementById('matNomEdit').value.trim();
+        if (!nom) return showToast('Entrez un nom', 'error');
+
+        m.nom = nom;
+        m.type = document.getElementById('matTypeEdit').value;
+        m.statut = document.getElementById('matStatutEdit').value;
+        m.localisation = document.getElementById('matLocEdit').value;
+        m.derniereMaint = document.getElementById('matDernMaintEdit').value || null;
+        m.prochaineMaint = document.getElementById('matProcMaintEdit').value || null;
+
+        addMainCourante('Matériel', `Modification: ${nom}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Matériel modifié');
+        navigate('materiels');
+    });
+}
+
+function supprimerMateriel(id) {
+    const m = DB.materiels.find(x => x.id === id);
+    if (!m) return;
+
+    showConfirm(`Supprimer le matériel "${m.nom}" ?`, () => {
+        DB.materiels = DB.materiels.filter(x => x.id !== id);
+        addMainCourante('Matériel', `Suppression: ${m.nom}`, currentUser?.id);
+        sauvegarderVersFirebase();
+        showToast('🗑️ Matériel supprimé');
+        navigate('materiels');
+    });
+}
+    
 // ========== CONSIGNES ==========
 const niveauxConsigne = ['Courante', 'Particulière'];
 const destinataires = ['Tout le monde', 'Chef de poste', 'Chef de service'];
