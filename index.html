@@ -7,11 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -31,192 +28,174 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; }
-
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .gradient-header { background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); }
-        .gradient-success { background: linear-gradient(90deg, #10b981 0%, #34d399 100%); }
-        .gradient-warning { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
-        .gradient-danger { background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); }
-        .gradient-info { background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%); }
-
-        .dark .gradient-bg { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); }
-        .dark body { background: #0f172a; color: #e2e8f0; }
-
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
-        .dark .card { background: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-
+        .dark .card { background: #1e293b; }
         .sidebar { width: 280px; background: white; height: 100vh; position: fixed; left: 0; top: 0; z-index: 50; transition: transform 0.3s; }
         .dark .sidebar { background: #1e293b; }
-        .sidebar-hidden { transform: translateX(-100%); }
-
         .nav-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; margin: 4px 12px; border-radius: 12px; color: #64748b; font-weight: 500; transition: all 0.2s; cursor: pointer; }
         .nav-link:hover { background: #f1f5f9; color: #6366f1; }
-        .nav-link.active { background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
-        .dark .nav-link:hover { background: #334155; }
-
+        .nav-link.active { background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; }
         .btn { padding: 10px 20px; border-radius: 10px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none; }
         .btn-primary { background: linear-gradient(90deg, #6366f1, #8b5cf6); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
-        .btn-success { background: linear-gradient(90deg, #10b981, #34d399); color: white; }
-        .btn-danger { background: linear-gradient(90deg, #ef4444, #f87171); color: white; }
-        .btn-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); color: white; }
         .btn-secondary { background: #f1f5f9; color: #475569; }
-        .dark .btn-secondary { background: #334155; color: #e2e8f0; }
-        .btn-sm { padding: 6px 12px; font-size: 13px; }
-        .btn-icon { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
-
-        .status-btn { width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; }
-        .status-btn.red { background: #ef4444; }
-        .status-btn.orange { background: #f59e0b; }
-        .status-btn.green { background: #10b981; }
-        .status-btn:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-
-        .input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white; }
-        .input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
-        .dark .input { background: #0f172a; border-color: #334155; color: white; }
-
+        .btn-danger { background: linear-gradient(90deg, #ef4444, #f87171); color: white; }
+        .input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; }
+        .input:focus { outline: none; border-color: #6366f1; }
         .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-purple { background: #f3e8ff; color: #9333ea; }
         .badge-success { background: #dcfce7; color: #16a34a; }
         .badge-warning { background: #fef3c7; color: #d97706; }
         .badge-danger { background: #fee2e2; color: #dc2626; }
         .badge-info { background: #dbeafe; color: #2563eb; }
-        .badge-purple { background: #f3e8ff; color: #9333ea; }
-        .dark .badge-success { background: #166534; color: #bbf7d0; }
-        .dark .badge-warning { background: #92400e; color: #fde68a; }
-        .dark .badge-danger { background: #991b1b; color: #fecaca; }
-        .dark .badge-info { background: #1e40af; color: #bfdbfe; }
-        .dark .badge-purple { background: #581c87; color: #e9d5ff; }
-
-        .stat-card { padding: 20px; border-radius: 16px; text-align: center; }
-        .stat-card .icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 20px; }
-        .stat-card .value { font-size: 28px; font-weight: 700; }
-        .stat-card .label { font-size: 13px; color: #64748b; margin-top: 4px; }
-
-        .table { width: 100%; }
-        .table th { padding: 14px 16px; text-align: left; font-weight: 600; color: #64748b; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
-        .table td { padding: 16px; border-bottom: 1px solid #f1f5f9; }
-        .table tr:hover td { background: #f8fafc; }
-        .dark .table th { border-color: #334155; }
-        .dark .table td { border-color: #334155; }
-        .dark .table tr:hover td { background: #334155; }
-
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; backdrop-filter: blur(4px); }
-        .modal-content { background: white; border-radius: 20px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; animation: modalIn 0.3s; }
-        .dark .modal-content { background: #1e293b; }
-        @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(-20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        .modal-header { padding: 24px 24px 0; }
-        .modal-body { padding: 24px; }
-        .modal-footer { padding: 0 24px 24px; display: flex; gap: 12px; justify-content: flex-end; }
-
-        .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
-        .status-dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
-        .status-dot.orange { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-        .status-dot.green { background: #10b981; box-shadow: 0 0 8px #10b981; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-
-        .timeline { position: relative; padding-left: 30px; }
-        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #e2e8f0; }
-        .dark .timeline::before { background: #334155; }
-        .timeline-item { position: relative; padding-bottom: 20px; }
-        .timeline-item::before { content: ''; position: absolute; left: -22px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; }
-        .dark .timeline-item::before { border-color: #1e293b; }
-        .timeline-item.first::before { background: #ef4444; width: 16px; height: 16px; left: -24px; top: 3px; }
-
-        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-        .qr-card { padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; text-align: center; page-break-inside: avoid; }
-        .dark .qr-card { border-color: #334155; }
-
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
         @media (max-width: 1024px) {
             .sidebar { transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
             .main-content { margin-left: 0 !important; }
         }
-
-        @media print {
-            .no-print { display: none !important; }
-            .sidebar { display: none !important; }
-            .main-content { margin-left: 0 !important; }
-            body { background: white; }
-            .card { box-shadow: none; border: 1px solid #e2e8f0; }
-        }
-
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        .mobile-nav-btn { transition: all 0.2s; }
-        .mobile-nav-btn:active { transform: scale(0.95); }
-        .mobile-nav-btn.active { color: #6366f1; }
-        .mobile-nav-btn.active i { color: #6366f1; }
-        .dark .mobile-nav-btn.active { color: #818cf8; }
-        .dark .mobile-nav-btn.active i { color: #818cf8; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-slate-900">
-// ========== DATABASE ==========
+<body class="bg-gray-50">
+
+<div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <div class="card p-8 w-full max-w-md fade-in">
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 gradient-header rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-shield-alt text-white text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">SSIAP Patrol</h1>
+            <p class="text-gray-500 mt-1">Système de gestion des rondes</p>
+        </div>
+        <div class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Agent</label>
+                <select id="loginAgent" class="input">
+                    <option value="">Sélectionner un agent...</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Code PIN</label>
+                <input type="password" id="loginPassword" class="input" placeholder="••••••" maxlength="6">
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 text-sm">
+                <div class="font-semibold text-gray-700 mb-2">🔐 Code PIN</div>
+                <div class="space-y-1 text-gray-600">
+                    <div>Administrateur → 321518</div>
+                    <div>SSIAP 1/2/3 → Code basé sur date de contrat</div>
+                </div>
+            </div>
+            <div id="loginError" class="text-red-500 text-sm font-medium hidden"></div>
+            <button onclick="login()" class="btn btn-primary w-full justify-center py-3">
+                <i class="fas fa-sign-in-alt"></i> Se connecter
+            </button>
+            <button onclick="accederModeRondier()" class="btn btn-secondary w-full justify-center">
+                <i class="fas fa-mobile-alt"></i> Accès Rondier Mobile
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="loginRondier" class="gradient-bg min-h-screen flex items-center justify-center p-4 hidden">
+    <div class="card p-6 w-full max-w-md fade-in">
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-walking text-white text-2xl"></i>
+            </div>
+            <h1 class="text-xl font-bold text-gray-800">Connexion Rondier</h1>
+        </div>
+        <div id="rondierLoading" class="text-center py-8">
+            <i class="fas fa-sync-alt fa-spin text-3xl text-primary-500 mb-4"></i>
+            <p class="text-gray-500">Chargement...</p>
+        </div>
+        <div id="rondierContent" class="space-y-4 hidden">
+            <div id="rondierAgentsList"></div>
+            <div id="rondierNoAgent" class="text-center py-6 hidden">
+                <p class="text-gray-600">Aucun rondier en poste</p>
+                <button onclick="rechargerAgentsRondier()" class="btn btn-secondary mt-4">
+                    <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+            </div>
+            <button onclick="afficherLoginPrincipal()" class="btn btn-secondary w-full justify-center">
+                <i class="fas fa-desktop"></i> Connexion PC
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="mainApp" class="hidden">
+    <aside class="sidebar" id="sidebar">
+        <div class="p-6 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 gradient-header rounded-xl flex items-center justify-center">
+                    <i class="fas fa-shield-alt text-white text-xl"></i>
+                </div>
+                <div>
+                    <div class="font-bold text-lg text-gray-800">SSIAP Patrol</div>
+                    <div class="text-xs text-gray-500" id="userBadge"></div>
+                    <div class="text-xs" id="firebaseStatus"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="py-4" id="navMenu"></nav>
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t space-y-2 bg-white" id="sidebarActions"></div>
+    </aside>
+    
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+    
+    <main class="main-content lg:ml-[280px] min-h-screen p-6">
+        <div id="mainContent"></div>
+    </main>
+</div>
+
+<script>
+// DATABASE
 const DB = {
     agents: [
         { id: 7, nom: 'Admin', prenom: 'Système', qualification: 'Administrateur', entreprise: 'SecuriPlus', actif: true, email: 'admin@securiplus.fr', telephone: '0600000000', codePin: '321518', dateDebutContrat: '2020-01-01', dateFinContrat: null },
-        { id: 1, nom: 'Martin', prenom: 'Jean-Pierre', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'jp.martin@securiplus.fr', telephone: '0612345678', dateDiplome: '2020-05-15', dateRecyclage: '2023-05-15', dateDebutContrat: '2020-06-01', dateFinContrat: null, codePin: null },
-        { id: 2, nom: 'Dupont', prenom: 'Alain', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'a.dupont@securiplus.fr', telephone: '0623456789', dateDiplome: '2019-03-10', dateRecyclage: '2022-03-10', dateDebutContrat: '2019-04-01', dateFinContrat: null, codePin: null },
-        { id: 3, nom: 'Boyer', prenom: 'Michel', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'm.boyer@securiplus.fr', telephone: '0634567890', dateDiplome: '2018-11-20', dateRecyclage: '2021-11-20', dateDebutContrat: '2018-12-01', dateFinContrat: null, codePin: null },
-        { id: 4, nom: 'Dubois', prenom: 'Marie', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'm.dubois@securiplus.fr', telephone: '0645678901', dateDiplome: '2021-01-25', dateRecyclage: '2024-01-25', dateDebutContrat: '2021-02-01', dateFinContrat: null, codePin: null },
-        { id: 5, nom: 'Garcia', prenom: 'Pierre', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'p.garcia@securiplus.fr', telephone: '0656789012', dateDiplome: '2020-09-05', dateRecyclage: '2023-09-05', dateDebutContrat: '2020-10-01', dateFinContrat: null, codePin: null },
-        { id: 6, nom: 'Leroy', prenom: 'François', qualification: 'SSIAP 3', entreprise: 'SecuriPlus', actif: true, email: 'f.leroy@securiplus.fr', telephone: '0667890123', dateDiplome: '2017-07-12', dateRecyclage: '2023-07-12', dateDebutContrat: '2017-08-01', dateFinContrat: null, codePin: null }
+        { id: 1, nom: 'Martin', prenom: 'Jean-Pierre', qualification: 'SSIAP 2', entreprise: 'SecuriPlus', actif: true, email: 'jp.martin@securiplus.fr', telephone: '0612345678', dateDebutContrat: '2020-06-01', dateFinContrat: null },
+        { id: 2, nom: 'Dupont', prenom: 'Alain', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'a.dupont@securiplus.fr', telephone: '0623456789', dateDebutContrat: '2019-04-01', dateFinContrat: null },
+        { id: 3, nom: 'Boyer', prenom: 'Michel', qualification: 'SSIAP 1', entreprise: 'SecuriPlus', actif: true, email: 'm.boyer@securiplus.fr', telephone: '0634567890', dateDebutContrat: '2018-12-01', dateFinContrat: null }
     ],
-    materiels: [
-        { id: 1, nom: 'Extincteur CO2 5kg - Hall', type: 'Extincteur', localisation: 'Hall Entrée - Zone A', statut: 'Opérationnel', derniereMaint: '2025-01-15', prochaineMaint: '2026-01-15' },
-        { id: 2, nom: 'RIA DN25 - Couloir 2ème', type: 'RIA', localisation: 'Couloir 2ème étage', statut: 'Opérationnel', derniereMaint: '2025-02-01', prochaineMaint: '2026-02-01' },
-        { id: 3, nom: 'Détecteur Optique B05', type: 'Détecteur', localisation: 'Bureau 205 - 2ème étage', statut: 'À vérifier', derniereMaint: '2024-12-01', prochaineMaint: '2025-06-01' },
-        { id: 4, nom: 'PCF Escalier A', type: 'Porte CF', localisation: 'Escalier A - RDC', statut: 'Opérationnel', derniereMaint: '2025-03-01', prochaineMaint: '2025-09-01' },
-        { id: 5, nom: 'Extincteur Eau 6L - Cuisine', type: 'Extincteur', localisation: 'Cuisine - RDC', statut: 'En maintenance', derniereMaint: '2025-01-10', prochaineMaint: '2026-01-10' }
-    ],
+    materiels: [],
     prisesPoste: [],
     rondes: [],
     evenements: [],
     mainCourante: [],
-    consignes: [
-        { id: 1, titre: 'Visite commission de sécurité', niveau: 'Particulière', destinataire: 'Tout le monde', priorite: 'Haute', contenu: 'Commission de sécurité prévue le 15 octobre 2025. Vérifier la mise à jour des registres.', dateDebut: '2025-07-01', dateFin: '2025-10-15', active: true },
-        { id: 2, titre: 'Contrôle accès livraisons', niveau: 'Courante', destinataire: 'Chef de poste', priorite: 'Normale', contenu: 'Vérifier systématiquement les bons de livraison et noter les immatriculations.', dateDebut: '2025-01-01', dateFin: null, active: true }
-    ]
+    consignes: []
 };
 
 let currentUser = null;
 let currentView = 'dashboard';
-let modalConfirmCallback = null;
+let donneesChargees = false;
+let updateInProgress = false;
+let lastKnownVersion = null;
 
-// ========== FIREBASE AMÉLIORÉ ==========
+// FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyBXK-4-9HBcTKCPQBdRzDSwTc55vRXWNOk",
     authDomain: "ssiap-patrol.firebaseapp.com",
     projectId: "ssiap-patrol",
     storageBucket: "ssiap-patrol.firebasestorage.app",
     messagingSenderId: "582750096370",
-    appId: "1:582750096370:web:025f700bc1bf9194afb96b",
-    measurementId: "G-3VW3N2LK4G"
+    appId: "1:582750096370:web:025f700bc1bf9194afb96b"
 };
 
-let firebaseApp = null;
 let db = null;
 let firestoreEnabled = false;
-let donneesChargees = false;
-let updateInProgress = false;
-let lastKnownVersion = null;
 
 try {
     if (typeof firebase !== 'undefined') {
-        firebaseApp = firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
         firestoreEnabled = true;
-        console.log('✅ Firebase initialisé avec succès');
+        console.log('✅ Firebase OK');
         updateFirebaseStatus(true);
     }
 } catch (e) {
-    console.log('❌ Firebase non disponible:', e);
+    console.log('❌ Firebase KO');
     firestoreEnabled = false;
     updateFirebaseStatus(false);
 }
@@ -225,57 +204,35 @@ function updateFirebaseStatus(connected) {
     setTimeout(() => {
         const el = document.getElementById('firebaseStatus');
         if (el) {
-            if (connected) {
-                el.innerHTML = '<span class="text-green-600"><i class="fas fa-cloud"></i> Firebase connecté</span>';
-            } else {
-                el.innerHTML = '<span class="text-red-600"><i class="fas fa-cloud-slash"></i> Hors ligne</span>';
-            }
+            el.innerHTML = connected ? 
+                '<span class="text-green-600"><i class="fas fa-cloud"></i> Connecté</span>' :
+                '<span class="text-red-600"><i class="fas fa-cloud-slash"></i> Hors ligne</span>';
         }
     }, 100);
 }
 
 function sauvegarderVersFirebase() {
-    if (!firestoreEnabled || !db) return;
-
-    if (!donneesChargees) {
-        console.warn('⚠️ BLOQUÉ: Tentative de sauvegarde avant chargement des données');
-        return;
-    }
-
-    if (updateInProgress) {
-        console.warn('⚠️ BLOQUÉ: Mise à jour en cours depuis Firebase');
-        return;
-    }
-
-    try {
-        const saveData = {
-            version: '1.0',
-            date: new Date().toISOString(),
-            lastModifiedBy: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
-            agents: DB.agents,
-            materiels: DB.materiels,
-            prisesPoste: DB.prisesPoste,
-            rondes: DB.rondes,
-            evenements: DB.evenements,
-            mainCourante: DB.mainCourante,
-            consignes: DB.consignes,
-            configEtablissement: typeof configEtablissement !== 'undefined' ? configEtablissement : {},
-            typesRondes: typeof typesRondes !== 'undefined' ? typesRondes : []
-        };
-
-        console.log('💾 Sauvegarde Firebase par:', saveData.lastModifiedBy);
-        console.log('   - prisesPoste:', DB.prisesPoste.length);
-        console.log('   - rondes:', DB.rondes.length);
-        
-        db.collection('ssiap-patrol').doc('data').set(saveData)
-            .then(() => {
-                console.log('✅ Données sauvegardées dans Firebase');
-                lastKnownVersion = saveData.date;
-            })
-            .catch(err => console.error('❌ Erreur sauvegarde Firebase:', err));
-    } catch (e) {
-        console.error('❌ Erreur lors de la sauvegarde Firebase:', e);
-    }
+    if (!firestoreEnabled || !db || !donneesChargees || updateInProgress) return;
+    
+    const saveData = {
+        version: '1.0',
+        date: new Date().toISOString(),
+        lastModifiedBy: currentUser ? `${currentUser.prenom} ${currentUser.nom}` : 'Système',
+        agents: DB.agents,
+        materiels: DB.materiels,
+        prisesPoste: DB.prisesPoste,
+        rondes: DB.rondes,
+        evenements: DB.evenements,
+        mainCourante: DB.mainCourante,
+        consignes: DB.consignes
+    };
+    
+    db.collection('ssiap-patrol').doc('data').set(saveData)
+        .then(() => {
+            console.log('💾 Sauvegarde OK');
+            lastKnownVersion = saveData.date;
+        })
+        .catch(err => console.error('❌ Erreur sauvegarde:', err));
 }
 
 function chargerDepuisFirebase(callback) {
@@ -284,520 +241,96 @@ function chargerDepuisFirebase(callback) {
         if (callback) callback();
         return;
     }
-
-    try {
-        db.collection('ssiap-patrol').doc('data').get()
-            .then(doc => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    DB.agents = data.agents || DB.agents;
-                    DB.materiels = data.materiels || DB.materiels;
-                    DB.prisesPoste = data.prisesPoste || [];
-                    DB.rondes = data.rondes || [];
-                    DB.evenements = data.evenements || [];
-                    DB.mainCourante = data.mainCourante || [];
-                    DB.consignes = data.consignes || DB.consignes;
-                    
-                    if (data.configEtablissement && typeof configEtablissement !== 'undefined') {
-                        configEtablissement = data.configEtablissement;
-                    }
-                    if (data.typesRondes && typeof typesRondes !== 'undefined') {
-                        typesRondes = data.typesRondes;
-                    }
-                    
-                    lastKnownVersion = data.date;
-                    
-                    console.log('✅ Données chargées depuis Firebase');
-                    console.log('   - prisesPoste:', DB.prisesPoste.length);
-                    console.log('   - Dernière modification par:', data.lastModifiedBy || 'Inconnu');
-                } else {
-                    console.log('⚠️ Document Firebase non trouvé - utilisation des données par défaut');
-                }
-                
-                donneesChargees = true;
-                console.log('🔓 Sauvegardes autorisées maintenant');
-
-                if (callback) callback();
-                else initLogin();
-            })
-            .catch(err => {
-                console.error('❌ Erreur chargement Firebase:', err);
-                donneesChargees = true;
-                if (callback) callback();
-                else initLogin();
-            });
-    } catch (e) {
-        console.error('❌ Erreur lors du chargement Firebase:', e);
-        donneesChargees = true;
-        if (callback) callback();
-        else initLogin();
-    }
-}
-
-function activerSyncTempsReel() {
-    if (!firestoreEnabled || !db) return;
-
-    try {
-        db.collection('ssiap-patrol').doc('data').onSnapshot(doc => {
+    
+    db.collection('ssiap-patrol').doc('data').get()
+        .then(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                
-                const isExternalChange = lastKnownVersion && data.date !== lastKnownVersion;
-                
-                if (isExternalChange) {
-                    console.log('🔄 Changement externe détecté par:', data.lastModifiedBy || 'Inconnu');
-                }
-                
-                updateInProgress = true;
-                
                 DB.agents = data.agents || DB.agents;
-                DB.materiels = data.materiels || DB.materiels;
+                DB.materiels = data.materiels || [];
                 DB.prisesPoste = data.prisesPoste || [];
                 DB.rondes = data.rondes || [];
                 DB.evenements = data.evenements || [];
                 DB.mainCourante = data.mainCourante || [];
-                DB.consignes = data.consignes || DB.consignes;
-                
-                if (data.configEtablissement && typeof configEtablissement !== 'undefined') {
-                    configEtablissement = data.configEtablissement;
-                }
-                if (data.typesRondes && typeof typesRondes !== 'undefined') {
-                    typesRondes = data.typesRondes;
-                }
-                
+                DB.consignes = data.consignes || [];
                 lastKnownVersion = data.date;
-                
-                updateInProgress = false;
-                
-                console.log('✅ Données synchronisées');
-                console.log('   - prisesPoste:', DB.prisesPoste.length);
-                console.log('   - agents en poste:', getAgentsEnPoste().length);
-
-                if (isExternalChange && currentUser && currentView) {
-                    afficherNotificationMiseAJour();
-                    
-                    if (['dashboard', 'rondes', 'evenements', 'materiels'].includes(currentView)) {
-                        rafraichirVue();
-                    }
-                }
+                console.log('✅ Données chargées');
             }
-        }, err => {
-            console.error('❌ Erreur sync temps réel:', err);
-            updateInProgress = false;
+            donneesChargees = true;
+            if (callback) callback();
+            else initLogin();
+        })
+        .catch(err => {
+            console.error('❌ Erreur chargement:', err);
+            donneesChargees = true;
+            if (callback) callback();
+            else initLogin();
         });
-    } catch (e) {
-        console.error('❌ Erreur activation sync temps réel:', e);
-        updateInProgress = false;
-    }
 }
 
-function afficherNotificationMiseAJour() {
-    if (document.getElementById('updateNotif')) return;
+function activerSyncTempsReel() {
+    if (!firestoreEnabled || !db) return;
     
-    const notif = document.createElement('div');
-    notif.id = 'updateNotif';
-    notif.className = 'fixed top-20 lg:top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 fade-in';
-    notif.innerHTML = `
-        <i class="fas fa-sync-alt fa-spin"></i>
-        <span class="text-sm">Données mises à jour</span>
-        <button onclick="this.parentElement.remove()" class="ml-2 hover:bg-white/20 rounded px-2">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    document.body.appendChild(notif);
-    
-    setTimeout(() => {
-        if (notif.parentElement) {
-            notif.classList.add('opacity-0', 'transition-opacity');
-            setTimeout(() => notif.remove(), 300);
-        }
-    }, 3000);
-}
-
-function rafraichirVue() {
-    const c = document.getElementById('mainContent');
-    if (c && views[currentView]) {
-        const scrollPos = window.scrollY;
-        c.innerHTML = '<div class="fade-in">' + views[currentView]() + '</div>';
-        setTimeout(() => window.scrollTo(0, scrollPos), 50);
-        
-        if (currentView === 'administration' && typeof adminTab !== 'undefined' && adminTab === 'qrcodes') {
-            setTimeout(() => { if (typeof genererQRCodesAdmin === 'function') genererQRCodesAdmin(); }, 100);
-        }
-    }
-}
-
-function rafraichirDonnees() {
-    showToast('🔄 Synchronisation...', 'info');
-    
-    updateInProgress = true;
-    
-    chargerDepuisFirebase(() => {
-        updateInProgress = false;
-        showToast('✅ Données synchronisées !');
-        
-        if (currentView) {
-            rafraichirVue();
-        }
-        
-        if (!currentUser && !document.getElementById('loginRondier').classList.contains('hidden')) {
-            afficherAgentsRondier();
+    db.collection('ssiap-patrol').doc('data').onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            const isExternalChange = lastKnownVersion && data.date !== lastKnownVersion;
+            
+            if (isExternalChange) console.log('🔄 Changement externe');
+            
+            updateInProgress = true;
+            DB.agents = data.agents || DB.agents;
+            DB.materiels = data.materiels || [];
+            DB.prisesPoste = data.prisesPoste || [];
+            DB.rondes = data.rondes || [];
+            DB.evenements = data.evenements || [];
+            DB.mainCourante = data.mainCourante || [];
+            DB.consignes = data.consignes || [];
+            lastKnownVersion = data.date;
+            updateInProgress = false;
+            
+            if (isExternalChange && currentUser && currentView) {
+                showToast('🔄 Données mises à jour', 'info');
+            }
         }
     });
 }
 
-// ========== DARK MODE ==========
-if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-    document.documentElement.classList.add('dark');
-}
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    document.documentElement.classList.toggle('dark', e.matches);
-});
-
-
-<!-- LOGIN PRINCIPAL (PC Sécurité) -->
-<div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
-    <div class="card p-8 w-full max-w-md fade-in">
-        <div class="text-center mb-8">
-            <div class="w-20 h-20 gradient-header rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <i class="fas fa-shield-alt text-white text-3xl"></i>
-            </div>
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white">SSIAP Patrol</h1>
-            <p class="text-gray-500 mt-1">Système de gestion des rondes</p>
-        </div>
-
-        <div class="space-y-5">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Agent</label>
-                <select id="loginAgent" class="input">
-                    <option value="">Sélectionner un agent...</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Code PIN</label>
-                <div class="relative">
-                    <input type="password" id="loginPassword" class="input pr-12" placeholder="••••••" maxlength="6" inputmode="numeric" oninput="afficherChiffreTemp(this)">
-                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                        <i id="eyeIcon" class="fas fa-eye text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="bg-gray-50 dark:bg-slate-800 rounded-xl p-4 text-sm">
-                <div class="font-semibold text-gray-700 dark:text-gray-300 mb-2">🔐 Code PIN</div>
-                <div class="space-y-1 text-gray-600 dark:text-gray-400">
-                    <div>Administrateur → Code PIN personnalisé (6 chiffres)</div>
-                    <div>SSIAP 1/2/3 → Code PIN généré automatiquement</div>
-                    <div class="text-xs mt-2 text-gray-500">Le code PIN SSIAP est basé sur la date de début de contrat</div>
-                </div>
-            </div>
-            <div id="loginError" class="text-red-500 text-sm font-medium hidden"></div>
-            <button onclick="login()" class="btn btn-primary w-full justify-center py-3">
-                <i class="fas fa-sign-in-alt"></i> Se connecter
-            </button>
-            <div class="pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
-                <button onclick="accederModeRondier()" class="btn btn-secondary w-full justify-center">
-                    <i class="fas fa-mobile-alt"></i> Accès Rondier Mobile
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- LOGIN RONDIER (Téléphone mobile) -->
-<div id="loginRondier" class="gradient-bg min-h-screen flex items-center justify-center p-4 hidden">
-    <div class="card p-6 w-full max-w-md fade-in">
-        <div class="text-center mb-6">
-            <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <i class="fas fa-walking text-white text-2xl"></i>
-            </div>
-            <h1 class="text-xl font-bold text-gray-800 dark:text-white">Connexion Rondier</h1>
-            <p class="text-gray-500 text-sm mt-1">Sélectionnez votre nom pour commencer</p>
-        </div>
-
-        <div id="rondierLoading" class="text-center py-8">
-            <i class="fas fa-sync-alt fa-spin text-3xl text-primary-500 mb-4"></i>
-            <p class="text-gray-500">Chargement des agents en poste...</p>
-        </div>
-
-        <div id="rondierContent" class="space-y-4 hidden">
-            <div id="rondierAgentsList" class="space-y-2">
-            </div>
-
-            <div id="rondierNoAgent" class="text-center py-6 hidden">
-                <div class="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl"></i>
-                </div>
-                <p class="text-gray-600 dark:text-gray-400 font-medium">Aucun rondier en poste</p>
-                <p class="text-gray-500 text-sm mt-2">Faites votre prise de poste au PC Sécurité d'abord.</p>
-                <button onclick="rechargerAgentsRondier()" class="btn btn-secondary mt-4">
-                    <i class="fas fa-sync-alt"></i> Actualiser
-                </button>
-            </div>
-
-            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button onclick="afficherLoginPrincipal()" class="btn btn-secondary w-full justify-center">
-                    <i class="fas fa-desktop"></i> Connexion PC Sécurité
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MAIN APP -->
-<div id="mainApp" class="hidden">
-    <aside class="sidebar no-print" id="sidebar">
-        <div class="p-6 border-b border-gray-100 dark:border-slate-700">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 gradient-header rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-shield-alt text-white text-xl"></i>
-                </div>
-                <div>
-                    <div class="font-bold text-lg text-gray-800 dark:text-white">SSIAP Patrol</div>
-                    <div class="text-xs text-gray-500" id="userBadge"></div>
-                    <div class="text-xs" id="firebaseStatus"></div>
-                </div>
-            </div>
-        </div>
-
-        <nav class="py-4 pb-48 overflow-y-auto" id="navMenu" style="max-height: calc(100vh - 120px);"></nav>
-
-        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-slate-700 space-y-2 bg-white dark:bg-slate-800" id="sidebarActions">
-        </div>
-    </aside>
-
-    <header id="mobileHeader" class="lg:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-800 shadow-md z-40 p-4 flex items-center justify-between no-print">
-        <button onclick="toggleSidebar()" class="btn btn-icon btn-secondary">
-            <i class="fas fa-bars"></i>
-        </button>
-        <div class="font-bold text-gray-800 dark:text-white">SSIAP Patrol</div>
-        <button onclick="logout()" class="btn btn-icon btn-secondary">
-            <i class="fas fa-sign-out-alt"></i>
-        </button>
-    </header>
-
-    <header id="rondierHeader" class="lg:hidden fixed top-0 left-0 right-0 gradient-header text-white z-40 p-3 hidden no-print">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <i class="fas fa-walking"></i>
-                </div>
-                <div>
-                    <div class="font-semibold text-sm" id="rondierHeaderName">Rondier</div>
-                    <div class="text-xs opacity-80">En service</div>
-                </div>
-            </div>
-            <button onclick="logout()" class="btn btn-sm bg-white/20 hover:bg-white/30 text-white border-0">
-                <i class="fas fa-sign-out-alt"></i>
-            </button>
-        </div>
-    </header>
-
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
-
-    <main class="main-content lg:ml-[280px] min-h-screen pt-20 lg:pt-0 pb-20 lg:pb-0">
-        <div class="p-6" id="mainContent"></div>
-    </main>
-
-    <nav id="mobileNavBar" class="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-50 hidden">
-        <div class="flex justify-around items-center h-16">
-            <button onclick="navigate('rondes')" id="mobileNavRondes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
-                <i class="fas fa-route text-xl mb-1"></i>
-                <span class="text-xs font-medium">Rondes</span>
-            </button>
-            <button onclick="navigate('materiels')" id="mobileNavMateriels" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
-                <i class="fas fa-fire-extinguisher text-xl mb-1"></i>
-                <span class="text-xs font-medium">Matériels</span>
-            </button>
-            <button onclick="navigate('consignes')" id="mobileNavConsignes" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 h-full text-gray-500 dark:text-gray-400">
-                <i class="fas fa-file-alt text-xl mb-1"></i>
-                <span class="text-xs font-medium">Consignes</span>
-            </button>
-        </div>
-    </nav>
-</div>
-
-<div id="modalContainer"></div>
-
-<script>
-// ========== UTILITIES ==========
+// UTILITIES
 const formatDate = d => d ? new Date(d).toLocaleDateString('fr-FR') : '-';
 const formatTime = d => d ? new Date(d).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : '-';
-const formatDateTime = d => d ? `${formatDate(d)} ${formatTime(d)}` : '-';
 const genId = () => Date.now() + Math.random();
 
 function getAgentsEnPoste() {
     return DB.prisesPoste.filter(p => !p.finPoste).map(p => {
         const agent = DB.agents.find(a => a.id === p.agentId);
-        return agent ? { ...agent, prisePosteId: p.id, poste: p.poste, heureDebut: p.heureDebut } : null;
+        return agent ? { ...agent, prisePosteId: p.id, heureDebut: p.heureDebut } : null;
     }).filter(Boolean);
 }
 
-function getChefDePoste() {
-    return getAgentsEnPoste().find(a => a.poste === 'Chef de poste');
+function showToast(message, type = 'success') {
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        info: 'bg-blue-500'
+    };
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 right-6 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 }
 
-function addMainCourante(type, description, agentId, extra = {}) {
-    const agent = DB.agents.find(a => a.id === agentId);
-    DB.mainCourante.unshift({
-        id: genId(), date: new Date().toISOString(), type, description,
-        agent: agent ? `${agent.prenom} ${agent.nom}` : 'Système', agentId, ...extra
-    });
-    sauvegarderVersFirebase();
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('hidden');
 }
 
-function getStatusColor(statut) {
-    if (statut === 'Début' || statut === 'Alerte' || statut === 'Nouveau') return 'red';
-    if (statut === 'En cours') return 'orange';
-    if (statut === 'Terminé') return 'green';
-    return 'red';
-}
-
-function verifierRecyclages() {
-    const maintenant = new Date();
-    const troixAnsEnMs = 3 * 365 * 24 * 60 * 60 * 1000;
-    let modifie = false;
-
-    DB.agents.forEach(agent => {
-        if (agent.dateRecyclage) {
-            const dateRecyclage = new Date(agent.dateRecyclage);
-            const diff = maintenant - dateRecyclage;
-
-            if (diff > troixAnsEnMs && agent.actif) {
-                agent.actif = false;
-                modifie = true;
-                console.log(`Agent ${agent.prenom} ${agent.nom} désactivé: recyclage expiré depuis ${formatDate(agent.dateRecyclage)}`);
-            }
-        }
-    });
-
-    if (modifie) {
-        sauvegarderVersFirebase();
-    }
-}
-
-function verifierDateContrat() {
-    if (!currentUser) return;
-
-    const agent = DB.agents.find(a => a.id === currentUser.id);
-    if (!agent) return;
-
-    const maintenant = new Date();
-
-    if (agent.dateFinContrat) {
-        const dateFin = new Date(agent.dateFinContrat);
-        if (maintenant > dateFin) {
-            showToast('Votre contrat est expiré. Déconnexion...', 'error');
-            setTimeout(() => {
-                logout();
-            }, 2000);
-            return;
-        }
-    }
-
-    if (!agent.actif) {
-        showToast('Votre compte a été désactivé. Déconnexion...', 'error');
-        setTimeout(() => {
-            logout();
-        }, 2000);
-    }
-}
-
-setInterval(verifierDateContrat, 60000);
-
-function verifierMaintenances() {
-    const aujourd_hui = new Date();
-    const dans30jours = new Date(aujourd_hui);
-    dans30jours.setDate(dans30jours.getDate() + 30);
-
-    const materielsConcernes = DB.materiels.filter(m => {
-        if (!m.prochaineMaint) return false;
-        const dateMaint = new Date(m.prochaineMaint);
-        return dateMaint >= aujourd_hui && dateMaint <= dans30jours;
-    });
-
-    materielsConcernes.forEach(m => {
-        const consigneExistante = DB.consignes.find(c =>
-            c.materielId === m.id &&
-            c.typeMaintenance === true &&
-            c.active === true
-        );
-
-        if (!consigneExistante) {
-            const joursRestants = Math.ceil((new Date(m.prochaineMaint) - aujourd_hui) / (1000 * 60 * 60 * 24));
-
-            const nouvelleConsigne = {
-                id: genId(),
-                titre: `🔧 Maintenance à prévoir: ${m.nom}`,
-                niveau: 'Particulière',
-                destinataire: 'SSIAP 3',
-                priorite: joursRestants <= 7 ? 'Haute' : 'Moyenne',
-                contenu: `📅 MAINTENANCE PROGRAMMÉE\n\nMatériel: ${m.nom}\nType: ${m.type}\nLocalisation: ${m.localisation || '-'}\n\nDate de prochaine maintenance: ${formatDate(m.prochaineMaint)}\nJours restants: ${joursRestants}\n\n⚠️ Veuillez prévoir la maintenance de ce matériel.`,
-                dateDebut: new Date().toISOString().split('T')[0],
-                dateFin: m.prochaineMaint,
-                active: true,
-                materielId: m.id,
-                typeMaintenance: true,
-                creePar: 'Système (Automatique)',
-                dateCreation: new Date().toISOString()
-            };
-
-            DB.consignes.push(nouvelleConsigne);
-            addMainCourante('Consigne', `Création automatique: Rappel maintenance ${m.nom} (J-${joursRestants})`, null);
-        }
-    });
-
-    DB.consignes.forEach(c => {
-        if (c.typeMaintenance && c.active && c.dateFin) {
-            const dateFin = new Date(c.dateFin);
-            if (dateFin < aujourd_hui) {
-                c.active = false;
-            }
-        }
-    });
-}
-
-// ========== LOGIN ==========
-let pinTimeout = null;
-
-function togglePasswordVisibility() {
-    const input = document.getElementById('loginPassword');
-    const icon = document.getElementById('eyeIcon');
-
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
-    }
-}
-
-function afficherChiffreTemp(input) {
-    if (pinTimeout) clearTimeout(pinTimeout);
-
-    const wasPassword = input.type === 'password';
-    if (wasPassword) {
-        input.type = 'text';
-
-        pinTimeout = setTimeout(() => {
-            const icon = document.getElementById('eyeIcon');
-            if (icon && icon.classList.contains('fa-eye')) {
-                input.type = 'password';
-            }
-        }, 500);
-    }
-}
-
+// LOGIN
 function initLogin() {
     const sel = document.getElementById('loginAgent');
-    const agentsTries = [...DB.agents.filter(a => a.actif)].sort((a, b) => {
-        const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
-        return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
-    });
     sel.innerHTML = '<option value="">Sélectionner un agent...</option>' +
-        agentsTries.map(a =>
+        DB.agents.filter(a => a.actif).map(a =>
             `<option value="${a.id}">${a.prenom} ${a.nom} - ${a.qualification}</option>`
         ).join('');
 }
@@ -806,38 +339,33 @@ function genererCodePin(dateDebutContrat) {
     if (!dateDebutContrat) return '0000';
     const d = new Date(dateDebutContrat);
     const base = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-    const pin = ((base * 9301 + 49297) % 10000).toString().padStart(4, '0');
-    return pin;
+    return ((base * 9301 + 49297) % 10000).toString().padStart(4, '0');
 }
 
 function obtenirCodePin(agent) {
-    if (agent.qualification === 'Administrateur') {
-        return agent.codePin || '321518';
-    }
-    return genererCodePin(agent.dateDebutContrat);
+    return agent.qualification === 'Administrateur' ? 
+        (agent.codePin || '321518') : genererCodePin(agent.dateDebutContrat);
 }
 
 function login() {
-    const agentIdStr = document.getElementById('loginAgent').value;
+    const agentId = document.getElementById('loginAgent').value;
     const pwd = document.getElementById('loginPassword').value;
-
-    if (!agentIdStr) return showLoginError('Sélectionnez un agent');
-
-    const agent = DB.agents.find(a => String(a.id) === String(agentIdStr));
-
+    
+    if (!agentId) return showLoginError('Sélectionnez un agent');
+    
+    const agent = DB.agents.find(a => String(a.id) === String(agentId));
     if (!agent) return showLoginError('Agent non trouvé');
-
-    const expectedPin = obtenirCodePin(agent);
-
-    if (pwd !== expectedPin) return showLoginError('Code PIN incorrect');
-
+    
+    if (pwd !== obtenirCodePin(agent)) return showLoginError('Code PIN incorrect');
+    
     currentUser = { ...agent };
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
-    document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
-
+    document.getElementById('userBadge').innerHTML = 
+        `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom}`;
+    
     chargerDepuisFirebase(() => {
-        console.log('✅ Données rechargées après connexion');
+        console.log('✅ Connexion réussie');
         initApp();
     });
 }
@@ -849,76 +377,28 @@ function showLoginError(msg) {
 }
 
 function logout() {
-    if (currentUser?.qualification === 'SSIAP 2') {
-        sauvegarderVersFirebase();
-        telechargerBackupAuto();
-    }
-
     currentUser = null;
     document.getElementById('mainApp').classList.add('hidden');
-
-    if (detecterModeRondier()) {
-        afficherLoginRondier();
-    } else {
-        document.getElementById('loginScreen').classList.remove('hidden');
-        document.getElementById('loginRondier').classList.add('hidden');
-        document.getElementById('loginPassword').value = '';
-        document.getElementById('loginError').classList.add('hidden');
-    }
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('loginRondier').classList.add('hidden');
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').classList.add('hidden');
 }
 
-function telechargerBackupAuto() {
-    const saveData = {
-        version: '1.0',
-        date: new Date().toISOString(),
-        agents: DB.agents,
-        materiels: DB.materiels,
-        prisesPoste: DB.prisesPoste,
-        rondes: DB.rondes,
-        evenements: DB.evenements,
-        mainCourante: DB.mainCourante,
-        consignes: DB.consignes
-    };
-
-    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ssiap-patrol-backup.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-// ========== LOGIN RONDIER (Mobile) - VERSION AMÉLIORÉE ==========
-
-function detecterModeRondier() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('mode') === 'rondier';
-}
-
+// RONDIER
 function accederModeRondier() {
     afficherLoginRondier();
 }
 
-function afficherLoginRondier(forceReload = false) {
+function afficherLoginRondier() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('loginRondier').classList.remove('hidden');
-    document.getElementById('mainApp').classList.add('hidden');
-
     document.getElementById('rondierLoading').classList.remove('hidden');
     document.getElementById('rondierContent').classList.add('hidden');
-
-    console.log('🔄 Rechargement des données pour mode rondier...');
     
     updateInProgress = true;
-    
     chargerDepuisFirebase(() => {
         updateInProgress = false;
-        console.log('✅ Données rechargées pour rondier');
-        console.log('📊 Prises de poste:', DB.prisesPoste.length);
-        console.log('📊 Agents en poste:', getAgentsEnPoste().length);
         afficherAgentsRondier();
     });
 }
@@ -926,47 +406,25 @@ function afficherLoginRondier(forceReload = false) {
 function afficherAgentsRondier() {
     document.getElementById('rondierLoading').classList.add('hidden');
     document.getElementById('rondierContent').classList.remove('hidden');
-
-    console.log('=== DEBUG RONDIER ===');
-    console.log('DB.prisesPoste:', JSON.stringify(DB.prisesPoste));
-    console.log('DB.agents:', DB.agents.length);
-
-    const prisesActives = DB.prisesPoste.filter(p => !p.finPoste);
-    console.log('Prises actives (sans finPoste):', prisesActives.length, JSON.stringify(prisesActives));
-
-    const tousAgentsEnPoste = getAgentsEnPoste();
-    console.log('Tous agents en poste:', tousAgentsEnPoste.length);
-
-    const agentsEnPoste = tousAgentsEnPoste.filter(a => a.qualification === 'SSIAP 1');
-    console.log('Agents SSIAP 1 en poste:', agentsEnPoste.length);
-
+    
+    const agentsEnPoste = getAgentsEnPoste().filter(a => a.qualification === 'SSIAP 1');
     const listContainer = document.getElementById('rondierAgentsList');
     const noAgentContainer = document.getElementById('rondierNoAgent');
-
+    
     if (agentsEnPoste.length === 0) {
-        listContainer.innerHTML = `
-            <div class="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-4">
-                <div class="font-bold mb-1">🔍 Debug Firebase:</div>
-                <div>Prises de poste en DB: ${DB.prisesPoste.length}</div>
-                <div>Prises actives (sans fin): ${prisesActives.length}</div>
-                <div>Agents en poste total: ${tousAgentsEnPoste.length}</div>
-                <div>Agents SSIAP 1 en poste: ${agentsEnPoste.length}</div>
-                ${prisesActives.length > 0 ? `<div class="mt-1">IDs agents en poste: ${prisesActives.map(p => p.agentId).join(', ')}</div>` : ''}
-            </div>
-        `;
+        listContainer.innerHTML = '';
         noAgentContainer.classList.remove('hidden');
     } else {
         noAgentContainer.classList.add('hidden');
         listContainer.innerHTML = agentsEnPoste.map(a => `
-            <button onclick="loginRondier(${a.id})" class="w-full p-4 bg-gray-50 dark:bg-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-xl flex items-center gap-4 transition-all border-2 border-transparent hover:border-primary-500">
-                <div class="w-12 h-12 gradient-header rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <button onclick="loginRondier(${a.id})" class="w-full p-4 bg-gray-50 hover:bg-primary-50 rounded-xl flex items-center gap-4 border-2 border-transparent hover:border-primary-500">
+                <div class="w-12 h-12 gradient-header rounded-full flex items-center justify-center text-white font-bold">
                     ${a.prenom.charAt(0)}${a.nom.charAt(0)}
                 </div>
                 <div class="flex-1 text-left">
-                    <div class="font-semibold text-gray-800 dark:text-white">${a.prenom} ${a.nom}</div>
-                    <div class="text-sm text-gray-500 flex items-center gap-2">
+                    <div class="font-semibold text-gray-800">${a.prenom} ${a.nom}</div>
+                    <div class="text-sm text-gray-500">
                         <span class="badge badge-purple text-xs">${a.qualification}</span>
-                        <span>En poste depuis ${formatTime(a.heureDebut)}</span>
                     </div>
                 </div>
                 <i class="fas fa-chevron-right text-gray-400"></i>
@@ -976,32 +434,21 @@ function afficherAgentsRondier() {
 }
 
 function rechargerAgentsRondier() {
-    showToast('🔄 Actualisation...', 'info');
-    afficherLoginRondier(true);
-    showToast('✅ Liste actualisée');
+    afficherLoginRondier();
 }
 
 function loginRondier(agentId) {
     const agent = DB.agents.find(a => a.id === agentId);
-    if (!agent) {
-        showToast('Agent non trouvé', 'error');
-        return;
-    }
-
-    console.log('🔍 Vérification prise de poste pour agent:', agentId);
-    console.log('   Prises de poste disponibles:', DB.prisesPoste.filter(p => !p.finPoste).map(p => ({id: p.agentId, nom: DB.agents.find(a => a.id === p.agentId)?.nom})));
+    if (!agent) return showToast('Agent non trouvé', 'error');
     
     const prisePoste = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
     if (!prisePoste) {
-        console.warn('⚠️ Agent non en poste - rechargement...');
-        showToast('Vérification du statut...', 'info');
-        
         updateInProgress = true;
         chargerDepuisFirebase(() => {
             updateInProgress = false;
-            const prisePosteRecheck = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
-            if (!prisePosteRecheck) {
-                showToast('Cet agent n\'est plus en poste', 'error');
+            const recheck = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
+            if (!recheck) {
+                showToast('Agent non en poste', 'error');
                 rechargerAgentsRondier();
             } else {
                 connexionRondierOK(agent);
@@ -1009,342 +456,143 @@ function loginRondier(agentId) {
         });
         return;
     }
-
+    
     connexionRondierOK(agent);
 }
 
 function connexionRondierOK(agent) {
     currentUser = { ...agent };
-
     document.getElementById('loginRondier').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
-    document.getElementById('userBadge').innerHTML = `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom} ${currentUser.nom}`;
-
+    document.getElementById('userBadge').innerHTML = 
+        `<span class="badge badge-purple">${currentUser.qualification}</span> ${currentUser.prenom}`;
     initApp();
     showToast(`✅ Bienvenue ${currentUser.prenom} !`);
 }
 
 function afficherLoginPrincipal() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('mode');
-    window.history.replaceState({}, document.title, url.toString());
-
     document.getElementById('loginRondier').classList.add('hidden');
     document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('mainApp').classList.add('hidden');
-
     initLogin();
 }
 
-
-// ========== CONFIG & TYPES RONDES ==========
-let configEtablissement = {
-    nom: 'Centre Commercial Atlantis',
-    adresse: '123 Avenue des Champs, 75008 Paris',
-    telephone: '01 23 45 67 89',
-    effectifNuit: 2,
-    effectifJour: 3
-};
-
-let typesRondes = [
-    { id: 1, nom: 'Ronde Générale', couleur: '#6366f1', points: [] },
-    { id: 2, nom: 'Ronde Technique', couleur: '#f59e0b', points: [] },
-    { id: 3, nom: 'Ronde Sécurité', couleur: '#10b981', points: [] }
-];
-
-// ========== UI FUNCTIONS ==========
-function showToast(message, type = 'success') {
-    const colors = {
-        success: 'bg-green-500',
-        error: 'bg-red-500',
-        info: 'bg-blue-500',
-        warning: 'bg-yellow-500'
-    };
-    
-    const toast = document.createElement('div');
-    toast.className = `fixed bottom-24 lg:bottom-6 right-6 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'transition-opacity');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebarOverlay');
-    sidebar.classList.toggle('open');
-    overlay.classList.toggle('hidden');
-}
-
-// ========== NAVIGATION ==========
+// NAVIGATION
 function navigate(view) {
     currentView = view;
     const c = document.getElementById('mainContent');
     if (c && views[view]) {
         c.innerHTML = '<div class="fade-in">' + views[view]() + '</div>';
     }
-    
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const activeLink = document.querySelector(`[data-view="${view}"]`);
     if (activeLink) activeLink.classList.add('active');
-    
-    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
-    const activeMobileBtn = document.getElementById(`mobileNav${view.charAt(0).toUpperCase() + view.slice(1)}`);
-    if (activeMobileBtn) activeMobileBtn.classList.add('active');
-    
-    if (window.innerWidth < 1024) {
-        toggleSidebar();
-    }
+    if (window.innerWidth < 1024) toggleSidebar();
 }
 
-// ========== VIEWS ==========
+// VIEWS
 const views = {
     dashboard: () => `
-        <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Tableau de bord</h1>
-            <p class="text-gray-500">Vue d'ensemble de l'activité</p>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div class="card stat-card gradient-header text-white">
-                <div class="icon bg-white/20">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="value">${getAgentsEnPoste().length}</div>
-                <div class="label text-white/80">Agents en poste</div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Tableau de bord</h1>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card p-6 gradient-header text-white">
+                <div class="text-3xl font-bold">${getAgentsEnPoste().length}</div>
+                <div class="mt-2">Agents en poste</div>
             </div>
-            
-            <div class="card stat-card bg-green-500 text-white">
-                <div class="icon bg-white/20">
-                    <i class="fas fa-route"></i>
-                </div>
-                <div class="value">${DB.rondes.filter(r => r.statut === 'En cours').length}</div>
-                <div class="label text-white/80">Rondes en cours</div>
+            <div class="card p-6 bg-green-500 text-white">
+                <div class="text-3xl font-bold">${DB.rondes.filter(r => r.statut === 'En cours').length}</div>
+                <div class="mt-2">Rondes en cours</div>
             </div>
-            
-            <div class="card stat-card bg-orange-500 text-white">
-                <div class="icon bg-white/20">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div class="value">${DB.evenements.filter(e => !e.dateFin).length}</div>
-                <div class="label text-white/80">Événements actifs</div>
-            </div>
-            
-            <div class="card stat-card bg-blue-500 text-white">
-                <div class="icon bg-white/20">
-                    <i class="fas fa-fire-extinguisher"></i>
-                </div>
-                <div class="value">${DB.materiels.filter(m => m.statut !== 'Opérationnel').length}</div>
-                <div class="label text-white/80">Matériels à vérifier</div>
+            <div class="card p-6 bg-orange-500 text-white">
+                <div class="text-3xl font-bold">${DB.evenements.filter(e => !e.dateFin).length}</div>
+                <div class="mt-2">Événements actifs</div>
             </div>
         </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="card p-6">
-                <h3 class="font-bold text-lg text-gray-800 dark:text-white mb-4">
-                    <i class="fas fa-clock text-primary-500 mr-2"></i>Dernières activités
-                </h3>
-                <div class="timeline">
-                    ${DB.mainCourante.slice(0, 5).map((m, idx) => `
-                        <div class="timeline-item ${idx === 0 ? 'first' : ''}">
-                            <div class="text-xs text-gray-500 mb-1">${formatDateTime(m.date)}</div>
-                            <div class="font-medium text-gray-800 dark:text-white">${m.type}</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">${m.description}</div>
-                            <div class="text-xs text-gray-500 mt-1">${m.agent}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            
-            <div class="card p-6">
-                <h3 class="font-bold text-lg text-gray-800 dark:text-white mb-4">
-                    <i class="fas fa-bell text-yellow-500 mr-2"></i>Consignes actives
-                </h3>
-                <div class="space-y-3">
-                    ${DB.consignes.filter(c => c.active).slice(0, 5).map(c => `
-                        <div class="p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <div class="font-medium text-gray-800 dark:text-white">${c.titre}</div>
-                                    <div class="text-xs text-gray-500 mt-1">
-                                        <span class="badge badge-${c.priorite === 'Haute' ? 'danger' : c.priorite === 'Moyenne' ? 'warning' : 'info'}">${c.priorite}</span>
-                                        ${c.destinataire}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
+        <div class="card p-6 mt-6">
+            <h3 class="font-bold text-lg mb-4">Dernières activités</h3>
+            ${DB.mainCourante.length === 0 ? 
+                '<p class="text-gray-500">Aucune activité récente</p>' :
+                DB.mainCourante.slice(0, 5).map(m => `
+                    <div class="border-l-4 border-primary-500 pl-4 py-2 mb-3">
+                        <div class="font-medium">${m.type}</div>
+                        <div class="text-sm text-gray-600">${m.description}</div>
+                        <div class="text-xs text-gray-500 mt-1">${m.agent} - ${formatTime(m.date)}</div>
+                    </div>
+                `).join('')
+            }
         </div>
     `,
     
     rondes: () => `
-        <div class="mb-6 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Rondes de sécurité</h1>
-                <p class="text-gray-500">Gestion et suivi des rondes</p>
-            </div>
-            ${currentUser.qualification !== 'SSIAP 1' ? '<button onclick="openModal('nouvelleRonde')" class="btn btn-primary"><i class="fas fa-plus"></i> Nouvelle ronde</button>' : ''}
-        </div>
-        
-        <div class="grid gap-4">
-            ${DB.rondes.length === 0 ? '<div class="card p-8 text-center text-gray-500">Aucune ronde enregistrée</div>' : 
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Rondes de sécurité</h1>
+        ${DB.rondes.length === 0 ? 
+            '<div class="card p-8 text-center text-gray-500">Aucune ronde enregistrée</div>' :
             DB.rondes.map(r => `
-                <div class="card p-4 hover:shadow-lg transition-shadow">
+                <div class="card p-4 mb-4">
                     <div class="flex items-center justify-between">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="status-dot ${getStatusColor(r.statut)}"></span>
-                                <span class="font-semibold text-gray-800 dark:text-white">${r.type || 'Ronde'}</span>
-                                <span class="badge badge-${r.statut === 'Terminé' ? 'success' : r.statut === 'En cours' ? 'warning' : 'danger'}">${r.statut}</span>
-                            </div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">
-                                <div><i class="fas fa-user mr-2"></i>${r.agent}</div>
-                                <div><i class="fas fa-clock mr-2"></i>Début: ${formatDateTime(r.heureDebut)}</div>
-                                ${r.heureFin ? `<div><i class="fas fa-check mr-2"></i>Fin: ${formatDateTime(r.heureFin)}</div>` : ''}
-                            </div>
+                        <div>
+                            <div class="font-semibold">${r.type || 'Ronde'}</div>
+                            <div class="text-sm text-gray-600">Agent: ${r.agent}</div>
+                            <div class="text-sm text-gray-600">Début: ${formatTime(r.heureDebut)}</div>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="voirDetailsRonde(${r.id})" class="btn btn-sm btn-secondary">
-                                <i class="fas fa-eye"></i> Détails
-                            </button>
-                        </div>
+                        <span class="badge badge-${r.statut === 'Terminé' ? 'success' : 'warning'}">${r.statut}</span>
                     </div>
                 </div>
-            `).join('')}
-        </div>
+            `).join('')
+        }
     `,
     
     materiels: () => `
-        <div class="mb-6 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Matériels incendie</h1>
-                <p class="text-gray-500">Inventaire et maintenances</p>
-            </div>
-        </div>
-        
-        <div class="card overflow-hidden">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Matériel</th>
-                        <th>Type</th>
-                        <th>Localisation</th>
-                        <th>Statut</th>
-                        <th>Prochaine maintenance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${DB.materiels.map(m => `
-                        <tr>
-                            <td class="font-medium text-gray-800 dark:text-white">${m.nom}</td>
-                            <td><span class="badge badge-info">${m.type}</span></td>
-                            <td class="text-gray-600 dark:text-gray-400">${m.localisation}</td>
-                            <td><span class="badge badge-${m.statut === 'Opérationnel' ? 'success' : m.statut === 'À vérifier' ? 'warning' : 'danger'}">${m.statut}</span></td>
-                            <td class="text-gray-600 dark:text-gray-400">${formatDate(m.prochaineMaint)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Matériels incendie</h1>
+        ${DB.materiels.length === 0 ?
+            '<div class="card p-8 text-center text-gray-500">Aucun matériel enregistré</div>' :
+            '<div class="card p-6">' + DB.materiels.map(m => `
+                <div class="border-b py-3">
+                    <div class="font-semibold">${m.nom}</div>
+                    <div class="text-sm text-gray-600">Type: ${m.type}</div>
+                    <div class="text-sm text-gray-600">Statut: <span class="badge badge-success">${m.statut}</span></div>
+                </div>
+            `).join('') + '</div>'
+        }
     `,
     
     consignes: () => `
-        <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">Consignes de sécurité</h1>
-            <p class="text-gray-500">Consignes courantes et particulières</p>
-        </div>
-        
-        <div class="space-y-4">
-            ${DB.consignes.filter(c => c.active).map(c => `
-                <div class="card p-6">
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex-1">
-                            <h3 class="font-bold text-lg text-gray-800 dark:text-white mb-2">${c.titre}</h3>
-                            <div class="flex gap-2 mb-3">
-                                <span class="badge badge-${c.priorite === 'Haute' ? 'danger' : c.priorite === 'Moyenne' ? 'warning' : 'info'}">${c.priorite}</span>
-                                <span class="badge badge-purple">${c.niveau}</span>
-                                <span class="badge badge-info">${c.destinataire}</span>
-                            </div>
-                        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Consignes de sécurité</h1>
+        ${DB.consignes.filter(c => c.active).length === 0 ?
+            '<div class="card p-8 text-center text-gray-500">Aucune consigne active</div>' :
+            DB.consignes.filter(c => c.active).map(c => `
+                <div class="card p-6 mb-4">
+                    <h3 class="font-bold text-lg mb-2">${c.titre}</h3>
+                    <div class="mb-3">
+                        <span class="badge badge-${c.priorite === 'Haute' ? 'danger' : 'warning'}">${c.priorite}</span>
+                        <span class="badge badge-purple ml-2">${c.niveau}</span>
                     </div>
-                    <div class="text-gray-700 dark:text-gray-300 whitespace-pre-line">${c.contenu}</div>
-                    <div class="text-xs text-gray-500 mt-4">
-                        Période: ${formatDate(c.dateDebut)} ${c.dateFin ? `→ ${formatDate(c.dateFin)}` : '(permanente)'}
-                    </div>
+                    <div class="text-gray-700 whitespace-pre-line">${c.contenu}</div>
                 </div>
-            `).join('')}
-        </div>
+            `).join('')
+        }
     `
 };
 
-// ========== INIT APP ==========
+// INIT APP
 function initApp() {
-    verifierRecyclages();
     activerSyncTempsReel();
     
-    const navItems = [];
+    const navItems = [
+        { icon: 'tachometer-alt', label: 'Tableau de bord', view: 'dashboard' },
+        { icon: 'route', label: 'Rondes', view: 'rondes' },
+        { icon: 'fire-extinguisher', label: 'Matériels', view: 'materiels' },
+        { icon: 'file-alt', label: 'Consignes', view: 'consignes' }
+    ];
     
-    if (currentUser.qualification === 'Administrateur') {
-        navItems.push(
-            { icon: 'tachometer-alt', label: 'Tableau de bord', view: 'dashboard' },
-            { icon: 'users', label: 'Agents', view: 'agents' },
-            { icon: 'route', label: 'Rondes', view: 'rondes' },
-            { icon: 'exclamation-triangle', label: 'Événements', view: 'evenements' },
-            { icon: 'fire-extinguisher', label: 'Matériels', view: 'materiels' },
-            { icon: 'file-alt', label: 'Consignes', view: 'consignes' },
-            { icon: 'book', label: 'Main courante', view: 'maincourante' },
-            { icon: 'clipboard-check', label: 'Prises de poste', view: 'prisesposte' },
-            { icon: 'cog', label: 'Administration', view: 'administration' }
-        );
-    } else if (currentUser.qualification === 'SSIAP 3') {
-        navItems.push(
-            { icon: 'tachometer-alt', label: 'Tableau de bord', view: 'dashboard' },
-            { icon: 'route', label: 'Rondes', view: 'rondes' },
-            { icon: 'exclamation-triangle', label: 'Événements', view: 'evenements' },
-            { icon: 'fire-extinguisher', label: 'Matériels', view: 'materiels' },
-            { icon: 'file-alt', label: 'Consignes', view: 'consignes' },
-            { icon: 'book', label: 'Main courante', view: 'maincourante' },
-            { icon: 'clipboard-check', label: 'Prises de poste', view: 'prisesposte' }
-        );
-    } else if (currentUser.qualification === 'SSIAP 2') {
-        navItems.push(
-            { icon: 'tachometer-alt', label: 'Tableau de bord', view: 'dashboard' },
-            { icon: 'route', label: 'Rondes', view: 'rondes' },
-            { icon: 'exclamation-triangle', label: 'Événements', view: 'evenements' },
-            { icon: 'fire-extinguisher', label: 'Matériels', view: 'materiels' },
-            { icon: 'file-alt', label: 'Consignes', view: 'consignes' },
-            { icon: 'book', label: 'Main courante', view: 'maincourante' },
-            { icon: 'clipboard-check', label: 'Prises de poste', view: 'prisesposte' }
-        );
-    } else if (currentUser.qualification === 'SSIAP 1') {
-        document.getElementById('mobileHeader').classList.add('hidden');
-        document.getElementById('rondierHeader').classList.remove('hidden');
-        document.getElementById('rondierHeaderName').textContent = `${currentUser.prenom} ${currentUser.nom}`;
-        document.getElementById('mobileNavBar').classList.remove('hidden');
-        
-        navItems.push(
-            { icon: 'route', label: 'Rondes', view: 'rondes' },
-            { icon: 'fire-extinguisher', label: 'Matériels', view: 'materiels' },
-            { icon: 'file-alt', label: 'Consignes', view: 'consignes' }
-        );
-    }
-    
-    const navMenu = document.getElementById('navMenu');
-    navMenu.innerHTML = navItems.map(item => `
+    document.getElementById('navMenu').innerHTML = navItems.map(item => `
         <div class="nav-link" data-view="${item.view}" onclick="navigate('${item.view}')">
             <i class="fas fa-${item.icon}"></i>
             <span>${item.label}</span>
         </div>
     `).join('');
     
-    const sidebarActions = document.getElementById('sidebarActions');
-    sidebarActions.innerHTML = `
-        <button onclick="rafraichirDonnees()" class="btn btn-secondary w-full justify-center">
+    document.getElementById('sidebarActions').innerHTML = `
+        <button onclick="sauvegarderVersFirebase(); showToast('Synchronisé !')" class="btn btn-secondary w-full justify-center">
             <i class="fas fa-sync-alt"></i> Synchroniser
         </button>
         <button onclick="logout()" class="btn btn-danger w-full justify-center">
@@ -1355,20 +603,13 @@ function initApp() {
     navigate('dashboard');
 }
 
-// Fonctions de placeholder
-function openModal(type) {
-    showToast('Fonctionnalité en cours de développement', 'info');
-}
-
-function voirDetailsRonde(id) {
-    showToast('Détails de la ronde ' + id, 'info');
-}
-
-// ========== INIT ==========
+// INIT
 document.addEventListener('DOMContentLoaded', () => {
+    // Afficher immédiatement les agents disponibles
+    initLogin();
+    // Puis charger depuis Firebase
     chargerDepuisFirebase();
 });
-
 </script>
 </body>
 </html>
