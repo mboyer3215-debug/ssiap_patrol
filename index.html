@@ -583,13 +583,33 @@ function togglePasswordVisibility() {
 }
 
 function initLogin() {
+    console.log('🔧 initLogin() appelé');
+    console.log('📊 DB.agents:', DB.agents);
+    console.log('📊 Agents actifs:', DB.agents.filter(a => a.actif));
+    
     const sel = document.getElementById('loginAgent');
+    console.log('📌 Element select trouvé:', sel);
+    
+    if (!sel) {
+        console.error('❌ Element #loginAgent non trouvé !');
+        return;
+    }
+    
     const agentsTries = [...DB.agents.filter(a => a.actif)].sort((a, b) => {
         const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
         return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
     });
-    sel.innerHTML = '<option value="">Sélectionner un agent...</option>' +
+    
+    console.log('📊 Agents triés:', agentsTries);
+    
+    const optionsHtml = '<option value="">Sélectionner un agent...</option>' +
         agentsTries.map(a => `<option value="${a.id}">${a.prenom} ${a.nom} - ${a.qualification}</option>`).join('');
+    
+    console.log('📝 HTML options:', optionsHtml);
+    
+    sel.innerHTML = optionsHtml;
+    
+    console.log('✅ Select mis à jour, options:', sel.options.length);
 }
 
 function genererCodePin(dateDebutContrat) {
@@ -3944,26 +3964,30 @@ async function convertirEnBase64(file) {
 
 // ========== INITIALISATION ==========
 document.addEventListener('DOMContentLoaded', () => {
-    // Toujours initialiser le login avec les données par défaut d'abord
+    console.log('🚀 DOM chargé');
+    console.log('📊 DB.agents au démarrage:', DB.agents.length, 'agents');
+    
+    // Vérifier que le select existe
+    const selectTest = document.getElementById('loginAgent');
+    console.log('📌 Select existe au DOMContentLoaded:', !!selectTest);
+    
+    // Initialiser le login avec les données par défaut
     initLogin();
     
     if (detecterModeRondier()) {
+        console.log('📱 Mode Rondier détecté');
         chargerDepuisFirebase(() => {
-            initLogin(); // Re-init après chargement Firebase
+            console.log('✅ Firebase chargé (rondier), agents:', DB.agents.length);
+            initLogin();
             afficherLoginRondier(false);
         });
     } else {
+        console.log('💻 Mode PC Sécurité');
         chargerDepuisFirebase(() => {
-            initLogin(); // Re-init après chargement Firebase
+            console.log('✅ Firebase chargé (PC), agents:', DB.agents.length);
+            initLogin();
             activerSyncTempsReel();
         });
-    }
-});
-
-// Raccourci clavier pour login rapide (dev)
-document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.getElementById('loginScreen')?.classList.contains('hidden') === false) {
-        login();
     }
 });
 </script>
