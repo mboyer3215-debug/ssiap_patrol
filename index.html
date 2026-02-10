@@ -150,11 +150,7 @@ const AGENTS_PAR_DEFAUT = [
 
 const DB = {
     agents: JSON.parse(JSON.stringify(AGENTS_PAR_DEFAUT)),
-    materiels: [
-        { id: 1, nom: 'Extincteur CO2 5kg - Hall', type: 'Extincteur', localisation: 'Bâtiment Principal > RDC > Hall', statut: 'Opérationnel', codeQR: 'MAT-1' },
-        { id: 2, nom: 'RIA DN25 - Couloir 2ème', type: 'RIA', localisation: 'Bâtiment Principal > 2ème étage > Couloir', statut: 'Opérationnel', codeQR: 'MAT-2' },
-        { id: 5, nom: 'Extincteur Eau 6L - Cuisine', type: 'Extincteur', localisation: 'Bâtiment Annexe > 1er étage > Réfectoire', statut: 'Opérationnel', codeQR: 'MAT-5' }
-    ],
+    materiels: [],
     prisesPoste: [],
     rondes: [],
     evenements: [],
@@ -168,9 +164,8 @@ let modalConfirmCallback = null;
 let html5QrScanner = null;
 
 let filtresRondes = { texte: '', statut: '', type: '' };
-let filtresMainCourante = { texte: '', type: '', dateDebut: '', dateFin: '' };
-let filtresMateriels = { texte: '', type: '', statut: '' };
-let filtresQRCodes = { type: '', batiment: '' };
+let filtresMainCourante = { texte: '', type: '' };
+let filtresMateriels = { texte: '', type: '' };
 
 let configEtablissement = {
     nom: "Établissement",
@@ -187,7 +182,7 @@ let configEtablissement = {
     ]
 };
 
-let typesRondes = ['Ronde de sécurité', 'Ronde Extincteurs', 'Ronde RIA', 'Ouverture', 'Fermeture'];
+let typesRondes = ['Ronde de sécurité', 'Ronde Extincteurs', 'Ronde RIA'];
 
 // ===== FIREBASE =====
 const firebaseConfig = {
@@ -203,6 +198,10 @@ let db = null;
 let firestoreEnabled = false;
 let unsubscribeSync = null;
 
+// Variables anti-boucle
+let isUpdatingFromFirebase = false;
+let lastSyncTime = 0;
+
 try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
@@ -216,18 +215,23 @@ function updateFirebaseStatus(connected) {
     const el = document.getElementById('firebaseStatus');
     if (el) {
         el.innerHTML = connected ? 
-            '<span class="text-green-600"><i class="fas fa-cloud"></i> Connecté</span>' : 
+            '<span class="text-green-600"><i class="fas fa-cloud"></i> Sync OK</span>' : 
             '<span class="text-red-600"><i class="fas fa-cloud-slash"></i> Hors ligne</span>';
     }
 }
 
 function sauvegarderVersFirebase() {
+    if (isUpdatingFromFirebase) {
+        console.log('⏳ Sauvegarde ignorée (sync en cours)');
+        return Promise.resolve();
+    }
+    
     if (!firestoreEnabled || !db) {
         console.log('⚠️ Firebase non disponible');
         return Promise.resolve();
     }
     
-    console.log('💾 Sauvegarde Firebase...');
+    console.log('💾 SAUVEGARDE - Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
     
     const saveData = {
         version: '1.0',
@@ -245,28 +249,31 @@ function sauvegarderVersFirebase() {
     
     return db.collection('ssiap-patrol').doc('data').set(saveData)
         .then(() => {
-            console.log('✅ Sauvegardé! Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
+            console.log('✅ Sauvegardé avec succès!');
+            showToast('✅ Synchronisé', 'success');
             updateFirebaseStatus(true);
         })
         .catch(err => {
-            console.error('❌ Erreur:', err);
+            console.error('❌ Erreur sauvegarde:', err);
+            showToast('❌ Erreur sync', 'error');
             updateFirebaseStatus(false);
         });
 }
 
 function chargerDepuisFirebase(callback) {
     if (!firestoreEnabled || !db) { 
-        console.log('⚠️ Firebase non disponible pour chargement');
+        console.log('⚠️ Firebase non disponible');
         if (callback) callback(); 
         return; 
     }
     
-    console.log('📥 Chargement Firebase...');
+    console.log('📥 CHARGEMENT depuis Firebase...');
     
     db.collection('ssiap-patrol').doc('data').get()
         .then(doc => {
             if (doc.exists) {
                 const data = doc.data();
+                
                 if (data.agents?.length) DB.agents = data.agents;
                 if (data.materiels?.length) DB.materiels = data.materiels;
                 DB.prisesPoste = data.prisesPoste || [];
@@ -276,8 +283,11 @@ function chargerDepuisFirebase(callback) {
                 if (data.consignes?.length) DB.consignes = data.consignes;
                 if (data.configEtablissement) configEtablissement = data.configEtablissement;
                 if (data.typesRondes) typesRondes = data.typesRondes;
-                console.log('✅ Chargé! Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
+                
+                console.log('✅ CHARGÉ - Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
                 updateFirebaseStatus(true);
+            } else {
+                console.log('📭 Aucune donnée dans Firebase');
             }
             if (callback) callback();
         })
@@ -293,16 +303,25 @@ function activerSyncTempsReel() {
     
     console.log('🔄 Activation sync temps réel...');
     
-    // Désabonner l'ancien listener
     if (unsubscribeSync) {
         unsubscribeSync();
     }
     
     unsubscribeSync = db.collection('ssiap-patrol').doc('data').onSnapshot(
         (doc) => {
-            if (doc.exists) {
+            const now = Date.now();
+            
+            // Éviter les syncs trop rapprochées (< 3 secondes)
+            if (now - lastSyncTime < 3000) {
+                return;
+            }
+            lastSyncTime = now;
+            
+            if (doc.exists && !isUpdatingFromFirebase) {
+                isUpdatingFromFirebase = true;
+                
                 const data = doc.data();
-                console.log('📥 Sync reçue - Rondes:', data.rondes?.length, 'MC:', data.mainCourante?.length);
+                console.log('📥 SYNC REÇUE - Rondes:', data.rondes?.length, 'MC:', data.mainCourante?.length);
                 
                 if (data.agents?.length) DB.agents = data.agents;
                 if (data.materiels?.length) DB.materiels = data.materiels;
@@ -321,10 +340,14 @@ function activerSyncTempsReel() {
                 }
                 
                 updateFirebaseStatus(true);
+                
+                setTimeout(() => {
+                    isUpdatingFromFirebase = false;
+                }, 2000);
             }
         },
         (error) => {
-            console.error('❌ Erreur sync:', error);
+            console.error('❌ Erreur sync temps réel:', error);
             updateFirebaseStatus(false);
         }
     );
@@ -359,7 +382,7 @@ function addMainCourante(type, description, agentId, extra = {}) {
         ...extra 
     };
     DB.mainCourante.unshift(entree);
-    console.log('📝 MC:', type, '-', description);
+    console.log('📝 MC ajoutée:', type, '-', description);
     return entree;
 }
 
@@ -374,9 +397,9 @@ function getBadgeClassFromCouleur(c) {
 }
 
 function getMainCouranteBadgeClass(type) {
-    if (['Alarme', 'Secours', 'Incident'].some(t => type.includes(t))) return 'badge-danger';
-    if (['Terminé'].some(t => type.includes(t))) return 'badge-success';
-    if (['Prise', 'Fin', 'Départ', 'Ronde'].some(t => type.includes(t))) return 'badge-warning';
+    if (['Alarme', 'Secours', 'Incident', 'Anomalie'].some(t => type.includes(t))) return 'badge-danger';
+    if (['Terminé', 'Fin'].some(t => type.includes(t))) return 'badge-success';
+    if (['Prise', 'Départ', 'Ronde'].some(t => type.includes(t))) return 'badge-warning';
     return 'badge-info';
 }
 
@@ -514,12 +537,22 @@ function initApp() {
 }
 
 function renderSidebarActions() {
-    let html = '';
-    if (currentUser?.qualification === 'Administrateur') {
-        html += `<button onclick="sauvegarderVersFirebase()" class="btn btn-success w-full justify-center btn-sm"><i class="fas fa-cloud-upload-alt"></i> Sauvegarder</button>`;
-    }
-    html += `<button onclick="logout()" class="btn btn-secondary w-full justify-center"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>`;
-    document.getElementById('sidebarActions').innerHTML = html;
+    document.getElementById('sidebarActions').innerHTML = `
+        <button onclick="forcerSync()" class="btn btn-success w-full justify-center btn-sm mb-2"><i class="fas fa-sync-alt"></i> Synchroniser</button>
+        <button onclick="logout()" class="btn btn-secondary w-full justify-center"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+    `;
+}
+
+function forcerSync() {
+    showToast('🔄 Synchronisation...', 'info');
+    sauvegarderVersFirebase().then(() => {
+        setTimeout(() => {
+            chargerDepuisFirebase(() => {
+                navigate(currentView);
+                showToast('✅ Synchronisé!', 'success');
+            });
+        }, 1000);
+    });
 }
 
 function renderNav() {
@@ -610,7 +643,7 @@ function renderDashboard() {
             <div class="stat-card bg-white"><div class="icon bg-green-100 text-green-600"><i class="fas fa-users"></i></div><div class="value">${agentsPoste.length}</div><div class="label">Agents en poste</div></div>
             <div class="stat-card bg-white"><div class="icon bg-blue-100 text-blue-600"><i class="fas fa-route"></i></div><div class="value">${rondesEnCours.length}</div><div class="label">Rondes en cours</div></div>
             <div class="stat-card bg-white"><div class="icon bg-purple-100 text-purple-600"><i class="fas fa-clipboard-list"></i></div><div class="value">${todayEvents.length}</div><div class="label">Actions aujourd'hui</div></div>
-            <div class="stat-card bg-white"><div class="icon bg-orange-100 text-orange-600"><i class="fas fa-fire-extinguisher"></i></div><div class="value">${DB.materiels.length}</div><div class="label">Matériels</div></div>
+            <div class="stat-card bg-white"><div class="icon bg-orange-100 text-orange-600"><i class="fas fa-database"></i></div><div class="value">${DB.rondes.length}</div><div class="label">Total rondes</div></div>
         </div>
         <div class="grid lg:grid-cols-2 gap-6">
             <div class="card">
@@ -623,7 +656,7 @@ function renderDashboard() {
             <div class="card">
                 <div class="gradient-info text-white p-4 font-semibold">Dernières actions</div>
                 <div class="p-4 space-y-2 max-h-64 overflow-y-auto">
-                    ${todayEvents.slice(0, 10).map(m => `<div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"><span class="badge ${getMainCouranteBadgeClass(m.type)}">${m.type}</span><span class="text-sm flex-1">${m.description.substring(0, 40)}...</span><span class="text-xs text-gray-400">${formatTime(m.date)}</span></div>`).join('') || '<p class="text-gray-500 text-center">Aucune action</p>'}
+                    ${todayEvents.slice(0, 10).map(m => `<div class="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"><span class="badge ${getMainCouranteBadgeClass(m.type)}">${m.type}</span><span class="text-sm flex-1 truncate">${m.description}</span><span class="text-xs text-gray-400">${formatTime(m.date)}</span></div>`).join('') || '<p class="text-gray-500 text-center">Aucune action</p>'}
                 </div>
             </div>
         </div>
@@ -674,8 +707,8 @@ function showModalPrisePoste() {
         
         const agent = DB.agents.find(a => a.id === agentId);
         addMainCourante('Prise de Poste', `${poste} - ${agent.prenom} ${agent.nom}`, agentId);
-        sauvegarderVersFirebase();
         
+        sauvegarderVersFirebase();
         closeModal();
         showToast('✅ Prise de poste enregistrée');
         navigate('prisePoste');
@@ -705,7 +738,11 @@ const categoriesRonde = [
 function renderRondes() {
     const isSsiap1 = currentUser?.qualification === 'SSIAP 1';
     const mesRondesEnCours = DB.rondes.filter(r => !r.heureFin && r.agentId === currentUser?.id);
-    const stats = { total: DB.rondes.length, enCours: DB.rondes.filter(r => !r.heureFin).length, terminees: DB.rondes.filter(r => r.heureFin).length };
+    const stats = { 
+        total: DB.rondes.length, 
+        enCours: DB.rondes.filter(r => !r.heureFin).length, 
+        terminees: DB.rondes.filter(r => r.heureFin).length 
+    };
     
     if (isSsiap1) return renderRondesMobile(mesRondesEnCours, stats);
     
@@ -717,8 +754,11 @@ function renderRondes() {
     
     return `
         <div class="flex items-center justify-between mb-6">
-            <div><h1 class="text-2xl font-bold"><i class="fas fa-route mr-2 text-primary-500"></i>Rondes</h1><p class="text-sm text-gray-500">${stats.total} rondes • ${stats.enCours} en cours</p></div>
-            <button onclick="chargerDepuisFirebase(() => navigate('rondes'))" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Actualiser</button>
+            <div>
+                <h1 class="text-2xl font-bold"><i class="fas fa-route mr-2 text-primary-500"></i>Rondes</h1>
+                <p class="text-sm text-gray-500">${stats.total} rondes • ${stats.enCours} en cours</p>
+            </div>
+            <button onclick="forcerSync()" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Sync</button>
         </div>
         <div class="search-filters no-print">
             <input type="text" class="input" placeholder="🔍 Rechercher..." value="${filtresRondes.texte}" onchange="filtresRondes.texte = this.value; navigate('rondes')">
@@ -790,6 +830,9 @@ function renderRondesMobile(mesRondesEnCours, stats) {
                         <button onclick="terminerRonde(${r.id})" class="bg-white/20 text-white font-bold py-3 rounded-xl border-2 border-white/50"><i class="fas fa-flag-checkered mr-2"></i>Terminer</button>
                     </div>
                 </div>
+                <button onclick="forcerSync()" class="w-full card p-3 flex items-center justify-center gap-2 text-primary-500">
+                    <i class="fas fa-sync-alt"></i> Synchroniser
+                </button>
             </div>
         `;
     }
@@ -807,6 +850,7 @@ function renderRondesMobile(mesRondesEnCours, stats) {
                 <div class="card p-4 text-center"><div class="text-3xl font-bold text-green-600">${stats.terminees}</div><div class="text-xs text-gray-500">Terminées</div></div>
                 <div class="card p-4 text-center"><div class="text-3xl font-bold text-blue-600">${stats.total}</div><div class="text-xs text-gray-500">Total</div></div>
             </div>
+            <button onclick="forcerSync()" class="btn btn-secondary"><i class="fas fa-sync-alt mr-2"></i>Synchroniser</button>
         </div>
     `;
 }
@@ -871,7 +915,6 @@ function demarrerRondeZone(nom, batimentId, secteurId) {
     let points = [];
     
     if (!batimentId) {
-        // Établissement complet
         configEtablissement.batiments.forEach(bat => {
             bat.secteurs.forEach(sect => {
                 sect.zones.forEach(zone => {
@@ -881,7 +924,6 @@ function demarrerRondeZone(nom, batimentId, secteurId) {
             });
         });
     } else if (!secteurId) {
-        // Bâtiment entier
         const bat = configEtablissement.batiments.find(b => b.id === batimentId);
         bat?.secteurs.forEach(sect => {
             sect.zones.forEach(zone => {
@@ -890,7 +932,6 @@ function demarrerRondeZone(nom, batimentId, secteurId) {
             });
         });
     } else {
-        // Secteur spécifique
         const bat = configEtablissement.batiments.find(b => b.id === batimentId);
         const sect = bat?.secteurs.find(s => s.id === secteurId);
         sect?.zones.forEach(zone => {
@@ -918,6 +959,8 @@ function demarrerRondeZone(nom, batimentId, secteurId) {
     
     DB.rondes.push(ronde);
     addMainCourante('Départ Ronde', `${ronde.nom} - ${points.length} points`, currentUser.id);
+    
+    console.log('🚀 Nouvelle ronde créée, sauvegarde...');
     sauvegarderVersFirebase();
     
     showToast(`🚀 Ronde démarrée ! ${points.length} points`);
@@ -973,8 +1016,8 @@ function demarrerRondeMateriels(catId) {
     
     DB.rondes.push(ronde);
     addMainCourante('Départ Ronde', `${ronde.nom} - ${points.length} points`, currentUser.id);
-    sauvegarderVersFirebase();
     
+    sauvegarderVersFirebase();
     showToast(`🚀 Ronde démarrée !`);
     navigate('rondes');
 }
@@ -988,11 +1031,11 @@ function scannerPointControle(rondeId) {
     
     showModal('Scanner un point', `
         <div class="space-y-4">
-            <div id="qr-reader"></div>
+            <div id="qr-reader" style="width:100%;"></div>
             <div id="qr-reader-results" class="text-center text-sm min-h-[24px]"></div>
             <div class="flex gap-2">
-                <button onclick="demarrerScanQR(${rondeId})" id="btnStartScan" class="btn btn-primary flex-1"><i class="fas fa-camera"></i> Démarrer</button>
-                <button onclick="arreterScanQR()" id="btnStopScan" class="btn btn-danger flex-1 hidden"><i class="fas fa-stop"></i> Arrêter</button>
+                <button onclick="demarrerScanQR(${rondeId})" id="btnStartScan" class="btn btn-primary flex-1"><i class="fas fa-camera"></i> Caméra</button>
+                <button onclick="arreterScanQR()" id="btnStopScan" class="btn btn-danger flex-1 hidden"><i class="fas fa-stop"></i> Stop</button>
             </div>
             <div class="border-t pt-4">
                 <label class="block text-sm font-semibold mb-2">Saisie manuelle</label>
@@ -1002,7 +1045,7 @@ function scannerPointControle(rondeId) {
                 </div>
             </div>
             <div class="border-t pt-4">
-                <p class="text-sm font-semibold mb-2">Points restants (${pointsRestants.length})</p>
+                <p class="text-sm font-semibold mb-2">Cliquer pour valider (${pointsRestants.length})</p>
                 <div class="space-y-2 max-h-40 overflow-y-auto">
                     ${pointsRestants.map(p => `
                         <button onclick="ouvrirValidationPoint(${rondeId}, ${p.id})" class="w-full p-2 bg-gray-50 rounded-lg flex items-center gap-3 text-left hover:bg-blue-50">
@@ -1023,13 +1066,8 @@ function demarrerScanQR(rondeId) {
     const btnStart = document.getElementById('btnStartScan');
     const btnStop = document.getElementById('btnStopScan');
     
-    if (!qrReader) {
-        console.error('Element qr-reader non trouvé');
-        return;
-    }
-    
-    if (typeof Html5Qrcode === 'undefined') {
-        resultsDiv.innerHTML = '<span class="text-red-500">Librairie QR non chargée</span>';
+    if (!qrReader || typeof Html5Qrcode === 'undefined') {
+        resultsDiv.innerHTML = '<span class="text-red-500">Scanner non disponible</span>';
         return;
     }
     
@@ -1037,7 +1075,6 @@ function demarrerScanQR(rondeId) {
     btnStop.classList.remove('hidden');
     resultsDiv.innerHTML = '<span class="text-blue-500"><i class="fas fa-spinner fa-spin mr-1"></i>Démarrage...</span>';
     
-    // Arrêter l'ancien scanner
     if (html5QrScanner) {
         try { html5QrScanner.stop(); } catch(e) {}
         html5QrScanner = null;
@@ -1045,38 +1082,29 @@ function demarrerScanQR(rondeId) {
     
     html5QrScanner = new Html5Qrcode("qr-reader");
     
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-    };
-    
     html5QrScanner.start(
         { facingMode: "environment" },
-        config,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
             console.log('✅ QR SCANNÉ:', decodedText);
             resultsDiv.innerHTML = `<span class="text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>${decodedText}</span>`;
             
             if (navigator.vibrate) navigator.vibrate(200);
             
-            // Arrêter et valider
             html5QrScanner.stop().then(() => {
                 html5QrScanner = null;
                 btnStart.classList.remove('hidden');
                 btnStop.classList.add('hidden');
-                
                 setTimeout(() => validerQRCode(rondeId, decodedText), 500);
             }).catch(() => {
                 setTimeout(() => validerQRCode(rondeId, decodedText), 500);
             });
         },
-        () => { /* erreurs silencieuses */ }
+        () => {}
     ).then(() => {
-        resultsDiv.innerHTML = '<span class="text-green-500"><i class="fas fa-camera mr-1"></i>Pointez vers un QR code</span>';
-        console.log('📷 Scanner actif');
+        resultsDiv.innerHTML = '<span class="text-green-500"><i class="fas fa-camera mr-1"></i>Pointez vers un QR</span>';
     }).catch((err) => {
-        console.error('❌ Erreur caméra:', err);
+        console.error('Erreur caméra:', err);
         resultsDiv.innerHTML = `<span class="text-red-500">${err}</span>`;
         btnStart.classList.remove('hidden');
         btnStop.classList.add('hidden');
@@ -1094,40 +1122,28 @@ function arreterScanQR() {
 }
 
 function validerQRCode(rondeId, code) {
-    console.log('=== VALIDATION QR ===');
-    console.log('Code reçu:', code);
+    console.log('Validation QR:', code);
     
     const r = DB.rondes.find(x => x.id === rondeId);
     if (!r) {
-        showToast('❌ Ronde non trouvée', 'error');
+        showToast('Ronde non trouvée', 'error');
         return;
     }
     
     const codeNorm = code.trim().toUpperCase();
-    console.log('Code normalisé:', codeNorm);
-    
-    // Afficher tous les codes pour debug
-    console.log('Codes disponibles:');
-    r.pointsControle.forEach((p, i) => {
-        console.log(`  ${i}: "${(p.qrCode || '').toUpperCase()}" - ${p.nom}`);
-    });
-    
-    const point = r.pointsControle.find(p => {
-        const qrNorm = (p.qrCode || '').trim().toUpperCase();
-        return qrNorm === codeNorm;
-    });
+    const point = r.pointsControle.find(p => (p.qrCode || '').trim().toUpperCase() === codeNorm);
     
     if (!point) {
-        showToast('❌ Code non reconnu', 'error');
+        showToast('Code non reconnu', 'error');
+        console.log('Codes attendus:', r.pointsControle.map(p => p.qrCode));
         return;
     }
     
     if (point.valide) {
-        showToast('⚠️ Déjà validé', 'warning');
+        showToast('Déjà validé', 'warning');
         return;
     }
     
-    console.log('✅ Point trouvé:', point.nom);
     closeModal();
     setTimeout(() => ouvrirValidationPoint(rondeId, point.id), 400);
 }
@@ -1150,29 +1166,25 @@ function ouvrirValidationPoint(rondeId, pointId) {
         const point = r.pointsControle.find(p => p.id === pointId);
         if (!point) return;
         
-        showModal(`Point: ${point.nom}`, `
+        showModal(`${point.nom}`, `
             <div class="space-y-4">
                 <div class="bg-blue-50 p-4 rounded-xl">
                     <div class="font-semibold text-blue-800">${point.nom}</div>
                     <div class="text-sm text-gray-600">${point.chemin || point.localisation || ''}</div>
-                    <div class="text-xs text-gray-400 mt-1">QR: ${point.qrCode}</div>
                 </div>
-                <div class="border-t pt-4">
-                    <div class="font-semibold mb-3">État du point</div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="validerPoint(${rondeId}, ${pointId}, 'OK')" class="p-4 bg-green-100 rounded-xl text-center hover:ring-2 hover:ring-green-500">
-                            <i class="fas fa-check-circle text-green-600 text-2xl mb-2"></i>
-                            <div class="text-sm font-medium text-green-700">Conforme</div>
-                        </button>
-                        <button onclick="validerPoint(${rondeId}, ${pointId}, 'Anomalie')" class="p-4 bg-orange-100 rounded-xl text-center hover:ring-2 hover:ring-orange-500">
-                            <i class="fas fa-exclamation-triangle text-orange-600 text-2xl mb-2"></i>
-                            <div class="text-sm font-medium text-orange-700">Anomalie</div>
-                        </button>
-                        <button onclick="validerPoint(${rondeId}, ${pointId}, 'HS')" class="p-4 bg-red-100 rounded-xl text-center hover:ring-2 hover:ring-red-500">
-                            <i class="fas fa-ban text-red-600 text-2xl mb-2"></i>
-                            <div class="text-sm font-medium text-red-700">Hors Service</div>
-                        </button>
-                    </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="validerPoint(${rondeId}, ${pointId}, 'OK')" class="p-4 bg-green-100 rounded-xl text-center">
+                        <i class="fas fa-check-circle text-green-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-green-700">OK</div>
+                    </button>
+                    <button onclick="validerPoint(${rondeId}, ${pointId}, 'Anomalie')" class="p-4 bg-orange-100 rounded-xl text-center">
+                        <i class="fas fa-exclamation-triangle text-orange-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-orange-700">Anomalie</div>
+                    </button>
+                    <button onclick="validerPoint(${rondeId}, ${pointId}, 'HS')" class="p-4 bg-red-100 rounded-xl text-center">
+                        <i class="fas fa-ban text-red-600 text-2xl mb-2"></i>
+                        <div class="text-sm font-medium text-red-700">HS</div>
+                    </button>
                 </div>
             </div>
         `, null, 'Annuler');
@@ -1196,20 +1208,18 @@ function validerPoint(rondeId, pointId, statut) {
         if (navigator.vibrate) navigator.vibrate(200);
         navigate('rondes');
     } else {
-        // Anomalie ou HS - demander description
         const horsService = statut === 'HS';
-        const couleur = horsService ? 'red' : 'orange';
         
         closeModal();
         setTimeout(() => {
             showModal(horsService ? '🚫 Hors Service' : '⚠️ Anomalie', `
                 <div class="space-y-4">
-                    <div class="bg-${couleur}-50 p-4 rounded-xl">
-                        <div class="font-semibold text-${couleur}-700">${point.nom}</div>
+                    <div class="bg-${horsService ? 'red' : 'orange'}-50 p-4 rounded-xl">
+                        <div class="font-semibold">${point.nom}</div>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Description *</label>
-                        <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez..."></textarea>
+                        <textarea id="anomalieDesc" class="input" rows="3"></textarea>
                     </div>
                 </div>
             `, () => {
@@ -1238,7 +1248,7 @@ function validerPoint(rondeId, pointId, statut) {
                 sauvegarderVersFirebase();
                 
                 closeModal();
-                showToast(horsService ? '🚫 HS signalé' : '⚠️ Anomalie signalée', horsService ? 'error' : 'warning');
+                showToast(horsService ? '🚫 HS signalé' : '⚠️ Anomalie signalée');
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                 navigate('rondes');
             }, 'Enregistrer');
@@ -1275,12 +1285,7 @@ function voirPointsRonde(rondeId) {
                         ${valides.map(p => {
                             const a = r.anomalies?.find(x => x.pointId === p.id);
                             const c = a ? (a.horsService ? 'red' : 'orange') : 'green';
-                            return `
-                                <div class="p-3 bg-${c}-50 rounded-lg flex items-center gap-3">
-                                    <i class="fas fa-${a?.horsService ? 'ban' : a ? 'exclamation-triangle' : 'check-circle'} text-${c}-500"></i>
-                                    <div class="flex-1"><div class="font-medium text-sm">${p.nom}</div></div>
-                                </div>
-                            `;
+                            return `<div class="p-3 bg-${c}-50 rounded-lg"><i class="fas fa-check-circle text-${c}-500 mr-2"></i>${p.nom}</div>`;
                         }).join('')}
                     </div>
                 </div>
@@ -1302,10 +1307,10 @@ function terminerRonde(rondeId) {
         <div class="space-y-4">
             <div class="bg-${hasHS ? 'red' : hasAnomalies ? 'orange' : 'green'}-50 p-4 rounded-lg">
                 <div class="font-bold">${hasHS ? '🚫 HS signalé' : hasAnomalies ? '⚠️ Anomalies' : '✅ Tout OK'}</div>
-                <div class="text-sm">${pts}/${total} points validés</div>
+                <div class="text-sm">${pts}/${total} points</div>
             </div>
             <div>
-                <label class="block text-sm font-semibold mb-2">Observation (optionnel)</label>
+                <label class="block text-sm font-semibold mb-2">Observation</label>
                 <textarea id="obsFin" class="input" rows="3"></textarea>
             </div>
         </div>
@@ -1315,6 +1320,8 @@ function terminerRonde(rondeId) {
         
         const duree = Math.round((new Date(r.heureFin) - new Date(r.heureDebut)) / 60000);
         addMainCourante('Fin Ronde', `${hasHS ? '🔴 HS' : hasAnomalies ? '🟠' : '🟢 OK'} ${r.nom} (${pts}/${total}, ${duree}min)`, r.agentId);
+        
+        console.log('🏁 Ronde terminée, sauvegarde...');
         sauvegarderVersFirebase();
         
         closeModal();
@@ -1331,8 +1338,8 @@ function voirRonde(id) {
     const pts = r.pointsControle?.filter(p => p.valide).length || 0;
     const total = r.pointsControle?.length || 0;
     
-    showModal('Détails Ronde', `
-        <div class="space-y-4 max-h-[70vh] overflow-y-auto">
+    showModal('Détails', `
+        <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <h3 class="text-xl font-bold">${r.nom || r.type}</h3>
                 <span class="badge ${r.heureFin ? 'badge-success' : 'badge-warning'}">${r.heureFin ? 'Terminée' : 'En cours'}</span>
@@ -1343,14 +1350,7 @@ function voirRonde(id) {
                 <div class="bg-gray-50 p-3 rounded-lg"><div class="text-xs text-gray-500">Début</div><div class="font-medium">${formatDateTime(r.heureDebut)}</div></div>
                 <div class="bg-gray-50 p-3 rounded-lg"><div class="text-xs text-gray-500">Fin</div><div class="font-medium">${r.heureFin ? formatDateTime(r.heureFin) : '-'}</div></div>
             </div>
-            ${r.anomalies?.length ? `
-                <div class="bg-orange-50 p-4 rounded-lg">
-                    <div class="font-bold mb-2">⚠️ Anomalies (${r.anomalies.length})</div>
-                    <ul class="text-sm space-y-1">
-                        ${r.anomalies.map(a => `<li><i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mr-1"></i>${a.pointNom}: ${a.description}</li>`).join('')}
-                    </ul>
-                </div>
-            ` : ''}
+            ${r.anomalies?.length ? `<div class="bg-orange-50 p-4 rounded-lg"><div class="font-bold mb-2">Anomalies</div><ul class="text-sm">${r.anomalies.map(a => `<li>${a.pointNom}: ${a.description}</li>`).join('')}</ul></div>` : ''}
         </div>
     `, null, 'Fermer');
 }
@@ -1368,7 +1368,7 @@ function renderMainCourante() {
     return `
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-2xl font-bold"><i class="fas fa-clipboard-list mr-2 text-primary-500"></i>Main Courante</h1>
-            <button onclick="chargerDepuisFirebase(() => navigate('mainCourante'))" class="btn btn-secondary"><i class="fas fa-sync-alt"></i></button>
+            <button onclick="forcerSync()" class="btn btn-secondary"><i class="fas fa-sync-alt"></i></button>
         </div>
         <div class="search-filters">
             <input type="text" class="input" placeholder="🔍 Rechercher..." value="${filtresMainCourante.texte}" onchange="filtresMainCourante.texte = this.value; navigate('mainCourante')">
@@ -1390,7 +1390,7 @@ function renderMainCourante() {
                                 <td>${m.description}</td>
                                 <td>${m.agent}</td>
                             </tr>
-                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
+                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -1409,30 +1409,27 @@ function renderMateriels() {
     const types = [...new Set(DB.materiels.map(m => m.type))];
     
     return `
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold"><i class="fas fa-fire-extinguisher mr-2 text-primary-500"></i>Matériels</h1>
-        </div>
+        <div class="mb-6"><h1 class="text-2xl font-bold"><i class="fas fa-fire-extinguisher mr-2 text-primary-500"></i>Matériels</h1></div>
         <div class="search-filters">
             <input type="text" class="input" placeholder="🔍 Rechercher..." value="${filtresMateriels.texte}" onchange="filtresMateriels.texte = this.value; navigate('materiels')">
             <select class="input" onchange="filtresMateriels.type = this.value; navigate('materiels')">
-                <option value="">Tous types</option>
+                <option value="">Tous</option>
                 ${types.map(t => `<option value="${t}" ${filtresMateriels.type === t ? 'selected' : ''}>${t}</option>`).join('')}
             </select>
         </div>
         <div class="card">
             <div class="overflow-x-auto">
                 <table class="table">
-                    <thead><tr><th>Matériel</th><th>Type</th><th>Localisation</th><th>Statut</th><th>QR</th></tr></thead>
+                    <thead><tr><th>Matériel</th><th>Type</th><th>Localisation</th><th>Statut</th></tr></thead>
                     <tbody>
-                        ${mats.map(m => `
+                        ${mats.length ? mats.map(m => `
                             <tr>
                                 <td class="font-medium">${m.nom}</td>
                                 <td><span class="badge badge-info">${m.type}</span></td>
                                 <td class="text-sm text-gray-600">${m.localisation || '-'}</td>
                                 <td><span class="badge ${m.statut === 'Opérationnel' ? 'badge-success' : 'badge-danger'}">${m.statut}</span></td>
-                                <td class="text-xs font-mono text-gray-400">${m.codeQR || '-'}</td>
                             </tr>
-                        `).join('')}
+                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -1456,38 +1453,36 @@ function renderConsignes() {
 }
 
 // ===== ADMINISTRATION =====
-let adminTab = 'donnees';
-
 function renderAdministration() {
     return `
         <div class="mb-6"><h1 class="text-2xl font-bold"><i class="fas fa-cogs mr-2 text-primary-500"></i>Administration</h1></div>
         <div class="card p-6 space-y-6">
             <div>
-                <h2 class="text-lg font-bold mb-4">Synchronisation Firebase</h2>
+                <h2 class="text-lg font-bold mb-4">Synchronisation</h2>
                 <div class="grid grid-cols-2 gap-4">
-                    <button onclick="sauvegarderVersFirebase()" class="btn btn-success py-4"><i class="fas fa-cloud-upload-alt mr-2"></i>Sauvegarder</button>
-                    <button onclick="chargerDepuisFirebase(() => { showToast('✅ Chargé'); navigate('administration'); })" class="btn btn-primary py-4"><i class="fas fa-cloud-download-alt mr-2"></i>Charger</button>
+                    <button onclick="sauvegarderVersFirebase()" class="btn btn-success py-4"><i class="fas fa-cloud-upload-alt mr-2"></i>Envoyer vers Cloud</button>
+                    <button onclick="chargerDepuisFirebase(() => { showToast('✅ Chargé'); navigate('administration'); })" class="btn btn-primary py-4"><i class="fas fa-cloud-download-alt mr-2"></i>Récupérer du Cloud</button>
                 </div>
             </div>
             <div class="border-t pt-6">
-                <h2 class="text-lg font-bold mb-4">Statistiques</h2>
+                <h2 class="text-lg font-bold mb-4">Statistiques actuelles</h2>
                 <div class="grid grid-cols-2 gap-4 text-sm">
                     <div class="bg-gray-50 p-3 rounded-lg">Agents: <strong>${DB.agents.length}</strong></div>
                     <div class="bg-gray-50 p-3 rounded-lg">Matériels: <strong>${DB.materiels.length}</strong></div>
-                    <div class="bg-gray-50 p-3 rounded-lg">Rondes: <strong>${DB.rondes.length}</strong></div>
-                    <div class="bg-gray-50 p-3 rounded-lg">Main courante: <strong>${DB.mainCourante.length}</strong></div>
+                    <div class="bg-blue-50 p-3 rounded-lg">Rondes: <strong>${DB.rondes.length}</strong></div>
+                    <div class="bg-purple-50 p-3 rounded-lg">Main courante: <strong>${DB.mainCourante.length}</strong></div>
                 </div>
             </div>
             <div class="border-t pt-6">
                 <h2 class="text-lg font-bold mb-4 text-red-600">Zone danger</h2>
-                <button onclick="reinitialiser()" class="btn btn-danger"><i class="fas fa-trash mr-2"></i>Réinitialiser les données</button>
+                <button onclick="reinitialiser()" class="btn btn-danger"><i class="fas fa-trash mr-2"></i>Réinitialiser</button>
             </div>
         </div>
     `;
 }
 
 function reinitialiser() {
-    showConfirm('⚠️ Supprimer toutes les rondes et main courante ?', () => {
+    showConfirm('⚠️ Supprimer toutes les données opérationnelles ?', () => {
         DB.prisesPoste = [];
         DB.rondes = [];
         DB.mainCourante = [];
@@ -1522,7 +1517,7 @@ function closeModal() {
 }
 
 function showConfirm(msg, onConfirm) { 
-    showModal('Confirmation', `<p class="text-gray-600">${msg}</p>`, onConfirm, 'Confirmer'); 
+    showModal('Confirmation', `<p>${msg}</p>`, onConfirm, 'Confirmer'); 
 }
 
 function showToast(msg, type = 'success') {
@@ -1547,10 +1542,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateFirebaseStatus(firestoreEnabled);
     });
-});
-
-document.addEventListener('keydown', e => { 
-    if (e.key === 'Enter' && !document.getElementById('loginScreen')?.classList.contains('hidden')) login(); 
 });
 </script>
 </body>
