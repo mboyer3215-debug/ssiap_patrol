@@ -34,7 +34,6 @@
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
         
         .sidebar { width: 280px; background: white; height: 100vh; position: fixed; left: 0; top: 0; z-index: 50; transition: transform 0.3s; box-shadow: 4px 0 20px rgba(0,0,0,0.1); }
-        .sidebar-hidden { transform: translateX(-100%); }
         
         .nav-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; margin: 4px 12px; border-radius: 12px; color: #64748b; font-weight: 500; transition: all 0.2s; cursor: pointer; }
         .nav-link:hover { background: #f1f5f9; color: #6366f1; }
@@ -94,8 +93,6 @@
         .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
         .qr-card { padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; text-align: center; background: white; }
         
-        .photo-preview { max-width: 100%; max-height: 150px; border-radius: 8px; margin-top: 8px; }
-        
         #qr-reader { width: 100%; min-height: 250px; }
         #qr-reader video { width: 100% !important; border-radius: 12px; }
         
@@ -105,11 +102,24 @@
             .main-content { margin-left: 0 !important; } 
         }
         
-        @media print { 
-            .no-print { display: none !important; } 
-            .sidebar { display: none !important; } 
-            .main-content { margin-left: 0 !important; } 
-            .card { box-shadow: none; border: 1px solid #e2e8f0; }
+        /* STYLES IMPRESSION OPTIMISÉS */
+        @media print {
+            .no-print { display: none !important; }
+            .sidebar { display: none !important; }
+            .main-content { margin-left: 0 !important; padding: 10px !important; }
+            body { font-size: 11px !important; background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 10px; }
+            .table { font-size: 11px !important; }
+            .table th, .table td { padding: 6px 8px !important; font-size: 11px !important; }
+            .badge { font-size: 9px !important; padding: 2px 6px !important; }
+            h1 { font-size: 16px !important; margin-bottom: 10px !important; }
+            .stat-card { display: none !important; }
+            .search-filters { display: none !important; }
+            .gradient-header, .gradient-success, .gradient-warning, .gradient-info { 
+                background: #f3f4f6 !important; 
+                color: #1f2937 !important; 
+                -webkit-print-color-adjust: exact;
+            }
         }
         
         .mobile-nav-btn { transition: all 0.2s; }
@@ -305,6 +315,8 @@ let filtresRondes = { texte: '', statut: '', type: '' };
 let filtresMainCourante = { texte: '', type: '', dateDebut: '', dateFin: '' };
 let filtresMateriels = { texte: '', type: '', statut: '' };
 let filtresEvenements = { texte: '', type: '', statut: '' };
+let filtresAgents = { texte: '', qualification: '' };
+let filtresConsignes = { texte: '', niveau: '', priorite: '' };
 
 // Configuration établissement
 let configEtablissement = {
@@ -374,15 +386,8 @@ function updateFirebaseStatus(connected) {
 }
 
 function sauvegarderVersFirebase() {
-    if (isUpdatingFromFirebase) {
-        console.log('⏳ Sauvegarde ignorée (sync en cours)');
-        return Promise.resolve();
-    }
-    
-    if (!firestoreEnabled || !db) {
-        console.log('⚠️ Firebase non disponible');
-        return Promise.resolve();
-    }
+    if (isUpdatingFromFirebase) return Promise.resolve();
+    if (!firestoreEnabled || !db) return Promise.resolve();
     
     console.log('💾 Sauvegarde - Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
     
@@ -417,8 +422,6 @@ function chargerDepuisFirebase(callback) {
         return; 
     }
     
-    console.log('📥 Chargement Firebase...');
-    
     db.collection('ssiap-patrol').doc('data').get()
         .then(doc => {
             if (doc.exists) {
@@ -446,10 +449,7 @@ function chargerDepuisFirebase(callback) {
 
 function activerSyncTempsReel() {
     if (!firestoreEnabled || !db) return;
-    
     if (unsubscribeSync) unsubscribeSync();
-    
-    console.log('🔄 Sync temps réel activée');
     
     unsubscribeSync = db.collection('ssiap-patrol').doc('data').onSnapshot(
         (doc) => {
@@ -470,8 +470,6 @@ function activerSyncTempsReel() {
                 if (data.consignes?.length) DB.consignes = data.consignes;
                 if (data.configEtablissement) configEtablissement = data.configEtablissement;
                 if (data.typesRondes?.length) typesRondes = data.typesRondes;
-                
-                console.log('📥 Sync - Rondes:', DB.rondes.length);
                 
                 if (currentUser && currentView && views[currentView]) {
                     const c = document.getElementById('mainContent');
@@ -531,7 +529,6 @@ function addMainCourante(type, description, agentId, extra = {}) {
         ...extra 
     };
     DB.mainCourante.unshift(entree);
-    console.log('📝 MC:', type);
     return entree;
 }
 
@@ -622,9 +619,7 @@ function detecterModeRondier() {
     return new URLSearchParams(window.location.search).get('mode') === 'rondier'; 
 }
 
-function accederModeRondier() { 
-    afficherLoginRondier(true); 
-}
+function accederModeRondier() { afficherLoginRondier(true); }
 
 function retourLogin() {
     document.getElementById('loginRondier').classList.add('hidden');
@@ -694,7 +689,6 @@ function loginRondier(agentId) {
 const menuItems = [
     { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Tableau de bord', roles: ['SSIAP 2', 'SSIAP 3', 'Administrateur'] },
     { id: 'prisePoste', icon: 'fa-user-clock', label: 'Prise de Poste', roles: ['SSIAP 2', 'SSIAP 3', 'Administrateur'] },
-    { id: 'verifications', icon: 'fa-clipboard-check', label: 'Vérifications', roles: ['SSIAP 2', 'SSIAP 3', 'Administrateur'] },
     { id: 'rondes', icon: 'fa-route', label: 'Rondes', roles: ['SSIAP 1', 'SSIAP 2', 'SSIAP 3', 'Administrateur'] },
     { id: 'mainCourante', icon: 'fa-clipboard-list', label: 'Main Courante', roles: ['SSIAP 2', 'SSIAP 3', 'Administrateur'] },
     { id: 'evenements', icon: 'fa-exclamation-triangle', label: 'Événements', roles: ['SSIAP 2', 'SSIAP 3', 'Administrateur'] },
@@ -743,7 +737,6 @@ function navigate(view) {
     const c = document.getElementById('mainContent');
     c.innerHTML = '<div class="fade-in">' + (views[view]?.() || '<p>Vue non disponible</p>') + '</div>';
     
-    // Fermer sidebar mobile
     const sidebar = document.getElementById('sidebar');
     if (sidebar?.classList.contains('open')) {
         sidebar.classList.remove('open');
@@ -798,7 +791,6 @@ function updateMobileNav() {
 const views = {
     dashboard: renderDashboard,
     prisePoste: renderPrisePoste,
-    verifications: renderVerifications,
     rondes: renderRondes,
     mainCourante: renderMainCourante,
     evenements: renderEvenements,
@@ -893,7 +885,7 @@ function renderDashboard() {
                         <div class="p-3 bg-orange-50 rounded-xl cursor-pointer hover:bg-orange-100" onclick="voirConsigne(${c.id})">
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="badge ${c.niveau === 'Particulière' ? 'badge-warning' : 'badge-info'}">${c.niveau}</span>
-                                <span class="badge badge-${c.priorite === 'Haute' ? 'danger' : c.priorite === 'Urgente' ? 'danger' : 'gray'}">${c.priorite}</span>
+                                <span class="badge ${c.priorite === 'Haute' || c.priorite === 'Urgente' ? 'badge-danger' : 'badge-gray'}">${c.priorite}</span>
                             </div>
                             <div class="font-medium text-sm">${c.titre}</div>
                         </div>
@@ -914,9 +906,14 @@ function renderPrisePoste() {
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-user-clock mr-2 text-primary-500"></i>Prise de Poste
             </h1>
-            <button onclick="showModalPrisePoste()" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Nouvelle prise de poste
-            </button>
+            <div class="flex gap-2 no-print">
+                <button onclick="showModalPrisePoste()" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Nouvelle
+                </button>
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="fas fa-print"></i>
+                </button>
+            </div>
         </div>
         
         <div class="card">
@@ -933,7 +930,7 @@ function renderPrisePoste() {
                                     <th>Qualification</th>
                                     <th>Poste</th>
                                     <th>Début</th>
-                                    <th>Actions</th>
+                                    <th class="no-print">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -943,7 +940,7 @@ function renderPrisePoste() {
                                         <td><span class="badge badge-info">${a.qualification}</span></td>
                                         <td><span class="badge ${a.poste === 'Chef de poste' ? 'badge-warning' : 'badge-success'}">${a.poste}</span></td>
                                         <td>${formatDateTime(a.heureDebut)}</td>
-                                        <td>
+                                        <td class="no-print">
                                             <button onclick="finPoste(${a.prisePosteId})" class="btn btn-danger btn-sm">
                                                 <i class="fas fa-stop"></i> Fin
                                             </button>
@@ -980,7 +977,7 @@ function showModalPrisePoste() {
                 <label class="block text-sm font-semibold mb-2">Poste</label>
                 <select id="ppPoste" class="input">
                     ${!hasChef ? '<option value="Chef de poste">Chef de poste</option>' : ''}
-                    <option value="Chef d\'équipe">Chef d'équipe</option>
+                    <option value="Chef d'équipe">Chef d'équipe</option>
                     <option value="Équipier">Équipier</option>
                 </select>
             </div>
@@ -996,8 +993,7 @@ function showModalPrisePoste() {
             agentId, 
             poste, 
             heureDebut: new Date().toISOString(), 
-            finPoste: null,
-            verificationsEffectuees: false
+            finPoste: null
         };
         DB.prisesPoste.push(pp);
         
@@ -1026,162 +1022,6 @@ function finPoste(id) {
     });
 }
 
-// ==================== VERIFICATIONS ====================
-
-const VERIFICATIONS_CONFIG = {
-    'Chef de poste': {
-        securite: ['Test SSI', 'Éclairage de sécurité', 'Moyens de secours PC'],
-        techniques: ['Test ligne directe', 'Test radio', 'PTI'],
-        administratives: ['Registre de sécurité', 'Consignes', 'Main courante']
-    },
-    'Chef d\'équipe': {
-        securite: [],
-        techniques: ['Test radio', 'PTI', 'Lampe torche'],
-        administratives: ['Consignes']
-    },
-    'Équipier': {
-        securite: [],
-        techniques: ['Test radio', 'PTI', 'Lampe torche'],
-        administratives: ['Consignes']
-    }
-};
-
-function renderVerifications() {
-    const agentsEnPoste = getAgentsEnPoste();
-    const agentsSansVerif = agentsEnPoste.filter(a => {
-        const pp = DB.prisesPoste.find(p => p.agentId === a.id && !p.finPoste);
-        return pp && !pp.verificationsEffectuees;
-    });
-    
-    return `
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">
-                <i class="fas fa-clipboard-check mr-2 text-primary-500"></i>Vérifications
-            </h1>
-        </div>
-        
-        ${agentsEnPoste.length === 0 ? `
-            <div class="card p-8 text-center">
-                <i class="fas fa-user-clock text-4xl text-gray-300 mb-4"></i>
-                <h2 class="text-xl font-bold mb-2">Aucun agent en poste</h2>
-                <p class="text-gray-500 mb-4">Effectuez d'abord une prise de poste</p>
-                <button onclick="navigate('prisePoste')" class="btn btn-primary">
-                    <i class="fas fa-user-clock"></i> Prise de Poste
-                </button>
-            </div>
-        ` : agentsSansVerif.length > 0 ? `
-            <div class="mb-6">
-                <h2 class="text-lg font-semibold mb-3">
-                    <i class="fas fa-exclamation-circle text-orange-500 mr-2"></i>
-                    Vérifications à effectuer (${agentsSansVerif.length})
-                </h2>
-                <div class="grid gap-4">
-                    ${agentsSansVerif.map(agent => {
-                        const pp = DB.prisesPoste.find(p => p.agentId === agent.id && !p.finPoste);
-                        return `
-                            <div class="card">
-                                <div class="gradient-warning text-white p-4 font-semibold flex items-center justify-between rounded-t-2xl">
-                                    <span><i class="fas fa-user mr-2"></i>${agent.prenom} ${agent.nom}</span>
-                                    <span class="badge bg-white/20 text-white">${pp?.poste || 'Agent'}</span>
-                                </div>
-                                <div class="p-4">
-                                    <button onclick="ouvrirVerificationsAgent(${agent.id})" class="btn btn-primary w-full">
-                                        <i class="fas fa-clipboard-check"></i> Effectuer les vérifications
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        ` : `
-            <div class="card p-8 text-center">
-                <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
-                <h2 class="text-xl font-bold text-green-600">Toutes les vérifications sont terminées !</h2>
-            </div>
-        `}
-    `;
-}
-
-function ouvrirVerificationsAgent(agentId) {
-    const agent = DB.agents.find(a => a.id === agentId);
-    const pp = DB.prisesPoste.find(p => p.agentId === agentId && !p.finPoste);
-    if (!agent || !pp) return;
-    
-    const config = VERIFICATIONS_CONFIG[pp.poste] || VERIFICATIONS_CONFIG['Équipier'];
-    const totalVerifs = config.securite.length + config.techniques.length + config.administratives.length;
-    
-    let html = '<div class="space-y-6">';
-    
-    if (config.securite.length > 0) {
-        html += `
-            <div class="bg-red-50 p-4 rounded-xl">
-                <div class="font-semibold mb-3 text-red-700"><i class="fas fa-shield-alt mr-2"></i>Sécurité</div>
-                <div class="space-y-2">
-                    ${config.securite.map(item => `
-                        <label class="flex items-center gap-3 p-2 bg-white rounded-lg cursor-pointer">
-                            <input type="checkbox" class="w-5 h-5 verif-check">
-                            <span>${item}</span>
-                        </label>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    if (config.techniques.length > 0) {
-        html += `
-            <div class="bg-yellow-50 p-4 rounded-xl">
-                <div class="font-semibold mb-3 text-yellow-700"><i class="fas fa-tools mr-2"></i>Techniques</div>
-                <div class="space-y-2">
-                    ${config.techniques.map(item => `
-                        <label class="flex items-center gap-3 p-2 bg-white rounded-lg cursor-pointer">
-                            <input type="checkbox" class="w-5 h-5 verif-check">
-                            <span>${item}</span>
-                        </label>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    if (config.administratives.length > 0) {
-        html += `
-            <div class="bg-blue-50 p-4 rounded-xl">
-                <div class="font-semibold mb-3 text-blue-700"><i class="fas fa-file-alt mr-2"></i>Administratives</div>
-                <div class="space-y-2">
-                    ${config.administratives.map(item => `
-                        <label class="flex items-center gap-3 p-2 bg-white rounded-lg cursor-pointer">
-                            <input type="checkbox" class="w-5 h-5 verif-check">
-                            <span>${item}</span>
-                        </label>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    html += `<div class="text-center text-lg font-semibold text-gray-600"><span id="verifChecked">0</span> / ${totalVerifs} vérifications</div></div>`;
-    
-    showModal(`Vérifications - ${agent.prenom} ${agent.nom}`, html, () => {
-        const checked = document.querySelectorAll('.verif-check:checked').length;
-        pp.verificationsEffectuees = checked === totalVerifs;
-        addMainCourante('Vérifications', `${pp.poste} - ${checked}/${totalVerifs} effectuées`, agentId);
-        sauvegarderVersFirebase();
-        closeModal();
-        showToast(pp.verificationsEffectuees ? '✅ Vérifications complètes !' : '⚠️ Vérifications incomplètes');
-        navigate('verifications');
-    }, 'Enregistrer');
-    
-    setTimeout(() => {
-        document.querySelectorAll('.verif-check').forEach(cb => {
-            cb.addEventListener('change', () => {
-                document.getElementById('verifChecked').textContent = document.querySelectorAll('.verif-check:checked').length;
-            });
-        });
-    }, 100);
-}
-
 // ==================== RONDES ====================
 
 function renderRondes() {
@@ -1196,7 +1036,6 @@ function renderRondes() {
     
     if (isSsiap1) return renderRondesMobile(mesRondesEnCours, stats);
     
-    // Filtrage
     let rondesFiltrees = DB.rondes.filter(r => {
         const matchTexte = !filtresRondes.texte || (r.nom || '').toLowerCase().includes(filtresRondes.texte.toLowerCase());
         const matchStatut = !filtresRondes.statut || 
@@ -1214,14 +1053,9 @@ function renderRondes() {
                 </h1>
                 <p class="text-sm text-gray-500">${stats.total} rondes • ${stats.enCours} en cours</p>
             </div>
-            <div class="flex gap-2">
-                <button onclick="forcerSync()" class="btn btn-secondary btn-sm no-print">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-                <button onclick="window.print()" class="btn btn-secondary btn-sm no-print">
-                    <i class="fas fa-print"></i>
-                </button>
-            </div>
+            <button onclick="window.print()" class="btn btn-primary no-print">
+                <i class="fas fa-print mr-2"></i>Imprimer
+            </button>
         </div>
         
         <div class="search-filters no-print">
@@ -1241,7 +1075,7 @@ function renderRondes() {
             </button>
         </div>
         
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 no-print">
             <div class="stat-card"><div class="text-2xl font-bold text-blue-600">${stats.total}</div><div class="text-xs text-gray-500">Total</div></div>
             <div class="stat-card"><div class="text-2xl font-bold text-orange-600">${stats.enCours}</div><div class="text-xs text-gray-500">En cours</div></div>
             <div class="stat-card"><div class="text-2xl font-bold text-green-600">${stats.terminees}</div><div class="text-xs text-gray-500">Terminées</div></div>
@@ -1271,9 +1105,9 @@ function renderRondes() {
                                 <div class="font-medium text-gray-800">${r.nom || r.type}</div>
                                 <div class="text-sm text-gray-500">${agent?.prenom || ''} ${agent?.nom || ''} • ${formatDateTime(r.heureDebut)}</div>
                                 ${total > 0 ? `
-                                    <div class="mt-2 flex items-center gap-2">
+                                    <div class="mt-2 flex items-center gap-2 no-print">
                                         <div class="flex-1 bg-gray-200 rounded-full h-2 max-w-xs">
-                                            <div class="bg-${couleur === 'green' ? 'green' : couleur === 'orange' ? 'orange' : 'red'}-500 h-2 rounded-full" style="width:${pct}%"></div>
+                                            <div class="h-2 rounded-full" style="width:${pct}%; background-color: ${couleur === 'green' ? '#10b981' : couleur === 'orange' ? '#f59e0b' : '#ef4444'}"></div>
                                         </div>
                                         <span class="text-xs text-gray-500">${pts}/${total}</span>
                                     </div>
@@ -1692,8 +1526,6 @@ function arreterScanQR() {
 }
 
 function validerQRCode(rondeId, code) {
-    console.log('Validation QR:', code);
-    
     const r = DB.rondes.find(x => x.id === rondeId);
     if (!r) {
         showToast('Ronde non trouvée', 'error');
@@ -1705,7 +1537,6 @@ function validerQRCode(rondeId, code) {
     
     if (!point) {
         showToast('Code QR non reconnu', 'error');
-        console.log('Codes attendus:', r.pointsControle.map(p => p.qrCode));
         return;
     }
     
@@ -1798,10 +1629,15 @@ function validerPoint(rondeId, pointId, statut) {
                         <label class="block text-sm font-semibold mb-2">Description de l'anomalie *</label>
                         <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez le problème..."></textarea>
                     </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Photo (optionnel)</label>
+                        <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input" onchange="previewPhoto(this)">
+                        <div id="photoPreview" class="mt-2"></div>
+                    </div>
                     ${horsService && point.materielId ? `
                         <div class="bg-red-100 p-3 rounded-lg text-sm text-red-700">
                             <i class="fas fa-info-circle mr-1"></i>
-                            Le matériel sera marqué Hors Service et une consigne sera créée automatiquement.
+                            Le matériel sera marqué Hors Service.
                         </div>
                     ` : ''}
                 </div>
@@ -1816,12 +1652,17 @@ function validerPoint(rondeId, pointId, statut) {
                 point.heureValidation = new Date().toISOString();
                 point.statut = statut;
                 
+                // Récupérer la photo en base64
+                const photoPreview = document.querySelector('#photoPreview img');
+                const photoBase64 = photoPreview ? photoPreview.src : null;
+                
                 if (!r.anomalies) r.anomalies = [];
                 r.anomalies.push({
                     id: genId(),
                     pointId,
                     pointNom: point.nom,
                     description: desc,
+                    photo: photoBase64,
                     horsService,
                     date: new Date().toISOString(),
                     agentId: currentUser.id
@@ -1834,20 +1675,6 @@ function validerPoint(rondeId, pointId, statut) {
                         mat.statut = 'Hors Service';
                         mat.observation = desc;
                         mat.dateHS = new Date().toISOString();
-                        
-                        // Créer consigne
-                        DB.consignes.push({
-                            id: genId(),
-                            titre: `${mat.nom} - HORS SERVICE`,
-                            niveau: 'Particulière',
-                            destinataire: 'Tout le monde',
-                            priorite: 'Haute',
-                            contenu: `⚠️ MATÉRIEL HORS SERVICE\n\nType: ${mat.type}\nLocalisation: ${mat.localisation}\n\nProblème: ${desc}\n\nSignalé le ${formatDateTime(new Date())} par ${currentUser.prenom} ${currentUser.nom}`,
-                            dateDebut: new Date().toISOString().split('T')[0],
-                            dateFin: null,
-                            active: true,
-                            materielId: mat.id
-                        });
                     }
                 }
                 
@@ -1860,6 +1687,40 @@ function validerPoint(rondeId, pointId, statut) {
                 navigate('rondes');
             }, 'Enregistrer');
         }, 400);
+    }
+}
+
+function previewPhoto(input) {
+    const preview = document.getElementById('photoPreview');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const maxSize = 800;
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height && width > maxSize) {
+                    height = (height * maxSize) / width;
+                    width = maxSize;
+                } else if (height > maxSize) {
+                    width = (width * maxSize) / height;
+                    height = maxSize;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                preview.innerHTML = `<img src="${compressed}" class="max-h-40 rounded-lg">`;
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
     }
 }
 
@@ -1877,6 +1738,11 @@ function signalerAnomalieMobile(rondeId) {
                 <label class="block text-sm font-semibold mb-2">Description *</label>
                 <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez le problème..."></textarea>
             </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Photo (optionnel)</label>
+                <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input" onchange="previewPhoto(this)">
+                <div id="photoPreview" class="mt-2"></div>
+            </div>
         </div>
     `, () => {
         const loc = document.getElementById('anomalieLoc')?.value || 'Non précisé';
@@ -1887,11 +1753,15 @@ function signalerAnomalieMobile(rondeId) {
             return;
         }
         
+        const photoPreview = document.querySelector('#photoPreview img');
+        const photoBase64 = photoPreview ? photoPreview.src : null;
+        
         if (!r.anomalies) r.anomalies = [];
         r.anomalies.push({
             id: genId(),
             localisation: loc,
             description: desc,
+            photo: photoBase64,
             horsService: false,
             date: new Date().toISOString(),
             agentId: currentUser.id
@@ -2048,28 +1918,45 @@ function voirRonde(id) {
             
             ${r.anomalies?.length ? `
                 <div class="bg-${r.anomalies.some(a => a.horsService) ? 'red' : 'orange'}-50 p-4 rounded-lg">
-                    <div class="font-bold mb-2">
+                    <div class="font-bold mb-3">
                         ${r.anomalies.some(a => a.horsService) ? '🚫' : '⚠️'} Anomalies (${r.anomalies.length})
                     </div>
-                    <ul class="text-sm space-y-2">
+                    <div class="space-y-4">
                         ${r.anomalies.map(a => `
-                            <li class="flex items-start gap-2">
-                                <i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mt-1"></i>
-                                <div>
-                                    <strong>${a.pointNom || a.localisation || 'Point'}</strong>: ${a.description}
+                            <div class="bg-white p-3 rounded-lg border-l-4 ${a.horsService ? 'border-red-500' : 'border-orange-500'}">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mt-1"></i>
+                                    <div class="flex-1">
+                                        <div class="font-semibold">${a.pointNom || a.localisation || 'Point'}</div>
+                                        <p class="text-sm text-gray-600 mt-1">${a.description}</p>
+                                        <div class="text-xs text-gray-400 mt-1">${formatDateTime(a.date)}</div>
+                                        ${a.photo ? `
+                                            <div class="mt-2">
+                                                <img src="${a.photo}" class="max-h-32 rounded-lg cursor-pointer" onclick="agrandirPhoto('${a.photo.replace(/'/g, "\\'")}')">
+                                            </div>
+                                        ` : ''}
+                                    </div>
                                 </div>
-                            </li>
+                            </div>
                         `).join('')}
-                    </ul>
+                    </div>
                 </div>
             ` : ''}
             
             ${r.observationFin ? `
                 <div class="bg-blue-50 p-4 rounded-lg">
-                    <div class="font-semibold text-blue-700 mb-2">Observation</div>
+                    <div class="font-semibold text-blue-700 mb-2">Observation finale</div>
                     <p class="text-sm">${r.observationFin}</p>
                 </div>
             ` : ''}
+        </div>
+    `, null, 'Fermer');
+}
+
+function agrandirPhoto(src) {
+    showModal('Photo', `
+        <div class="text-center">
+            <img src="${src}" class="max-w-full max-h-[60vh] rounded-lg mx-auto">
         </div>
     `, null, 'Fermer');
 }
@@ -2099,10 +1986,9 @@ function renderMainCourante() {
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-clipboard-list mr-2 text-primary-500"></i>Main Courante
             </h1>
-            <div class="flex gap-2 no-print">
-                <button onclick="forcerSync()" class="btn btn-secondary btn-sm"><i class="fas fa-sync-alt"></i></button>
-                <button onclick="window.print()" class="btn btn-secondary btn-sm"><i class="fas fa-print"></i></button>
-            </div>
+            <button onclick="window.print()" class="btn btn-primary no-print">
+                <i class="fas fa-print mr-2"></i>Imprimer
+            </button>
         </div>
         
         <div class="search-filters no-print">
@@ -2132,18 +2018,33 @@ function renderMainCourante() {
                             <th>Date/Heure</th>
                             <th>Type</th>
                             <th>Description</th>
+                            <th>Détails</th>
                             <th>Agent</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${entrees.length ? entrees.slice(0, 100).map(m => `
-                            <tr>
-                                <td class="whitespace-nowrap">${formatDateTime(m.date)}</td>
-                                <td><span class="badge ${getMainCouranteBadgeClass(m.type)}">${m.type}</span></td>
-                                <td>${m.description}</td>
-                                <td>${m.agent}</td>
-                            </tr>
-                        `).join('') : '<tr><td colspan="4" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
+                        ${entrees.length ? entrees.slice(0, 100).map(m => {
+                            let details = '';
+                            if (m.evenementId) {
+                                const evt = DB.evenements.find(e => e.id === m.evenementId);
+                                if (evt) {
+                                    if (evt.statut === 'En cours' && evt.commentaire) {
+                                        details = `<span class="text-orange-600 text-xs">${evt.commentaire.substring(0, 50)}${evt.commentaire.length > 50 ? '...' : ''}</span>`;
+                                    } else if (evt.statut === 'Terminé' && evt.compteRendu) {
+                                        details = `<span class="text-green-600 text-xs">${evt.compteRendu.substring(0, 50)}${evt.compteRendu.length > 50 ? '...' : ''}</span>`;
+                                    }
+                                }
+                            }
+                            return `
+                                <tr>
+                                    <td class="whitespace-nowrap">${formatDateTime(m.date)}</td>
+                                    <td><span class="badge ${getMainCouranteBadgeClass(m.type)}">${m.type}</span></td>
+                                    <td>${m.description}</td>
+                                    <td>${details}</td>
+                                    <td>${m.agent}</td>
+                                </tr>
+                            `;
+                        }).join('') : '<tr><td colspan="5" class="text-center py-8 text-gray-500">Aucun événement</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -2172,9 +2073,14 @@ function renderEvenements() {
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-exclamation-triangle mr-2 text-primary-500"></i>Événements
             </h1>
-            <button onclick="showModalEvenement()" class="btn btn-primary no-print">
-                <i class="fas fa-plus"></i> Nouvel événement
-            </button>
+            <div class="flex gap-2 no-print">
+                <button onclick="showModalEvenement()" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Nouveau
+                </button>
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="fas fa-print"></i>
+                </button>
+            </div>
         </div>
         
         <div class="search-filters no-print">
@@ -2190,9 +2096,12 @@ function renderEvenements() {
                 <option value="En cours" ${filtresEvenements.statut === 'En cours' ? 'selected' : ''}>🟠 En cours</option>
                 <option value="Terminé" ${filtresEvenements.statut === 'Terminé' ? 'selected' : ''}>🟢 Terminé</option>
             </select>
+            <button onclick="filtresEvenements = {texte:'', type:'', statut:''}; navigate('evenements')" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         
-        <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-3 gap-4 mb-6 no-print">
             <div class="stat-card bg-red-50"><div class="text-2xl font-bold text-red-600">${stats.debut}</div><div class="text-xs text-red-600">🔴 Alertes</div></div>
             <div class="stat-card bg-orange-50"><div class="text-2xl font-bold text-orange-600">${stats.enCours}</div><div class="text-xs text-orange-600">🟠 En cours</div></div>
             <div class="stat-card bg-green-50"><div class="text-2xl font-bold text-green-600">${stats.termine}</div><div class="text-xs text-green-600">🟢 Terminés</div></div>
@@ -2204,19 +2113,21 @@ function renderEvenements() {
                     const agent = DB.agents.find(a => a.id === e.agentId);
                     const color = e.statut === 'Début' ? 'red' : e.statut === 'En cours' ? 'orange' : 'green';
                     return `
-                        <div class="flex items-center justify-between p-4 bg-${color}-50 rounded-xl border-l-4 border-${color}-500">
-                            <div class="flex items-center gap-4">
-                                <span class="status-dot ${color}"></span>
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1">
+                        <div class="flex items-start justify-between p-4 bg-${color}-50 rounded-xl border-l-4 border-${color}-500">
+                            <div class="flex items-start gap-4 flex-1">
+                                <span class="status-dot ${color} no-print mt-1"></span>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1 flex-wrap">
                                         <span class="font-semibold">${e.type}</span>
                                         <span class="badge badge-${e.statut === 'Début' ? 'danger' : e.statut === 'En cours' ? 'warning' : 'success'}">${e.statut}</span>
                                     </div>
                                     ${e.localisation ? `<div class="text-sm text-gray-600"><i class="fas fa-map-marker-alt mr-1"></i>${e.localisation}</div>` : ''}
                                     <div class="text-sm text-gray-500">${agent?.prenom || ''} ${agent?.nom || ''} • ${formatDateTime(e.date)}</div>
+                                    ${e.commentaire && e.statut === 'En cours' ? `<div class="text-sm text-orange-600 mt-2 bg-orange-100 p-2 rounded"><i class="fas fa-comment mr-1"></i>${e.commentaire}</div>` : ''}
+                                    ${e.compteRendu && e.statut === 'Terminé' ? `<div class="text-sm text-green-600 mt-2 bg-green-100 p-2 rounded"><i class="fas fa-check-circle mr-1"></i>${e.compteRendu.substring(0, 100)}${e.compteRendu.length > 100 ? '...' : ''}</div>` : ''}
                                 </div>
                             </div>
-                            <div class="flex gap-2 no-print">
+                            <div class="flex gap-2 no-print ml-2">
                                 ${e.statut !== 'Terminé' ? `
                                     <button onclick="modifierStatutEvenement(${e.id})" class="btn btn-secondary btn-sm"><i class="fas fa-edit"></i></button>
                                 ` : ''}
@@ -2241,7 +2152,7 @@ function showModalEvenement() {
             });
         });
     });
-    locOptions += '<option value="Autre">Autre (préciser)</option>';
+    locOptions += '<option value="__autre__">Autre (préciser)</option>';
     
     showModal('Nouvel Événement', `
         <div class="space-y-4">
@@ -2261,7 +2172,7 @@ function showModalEvenement() {
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-2">Localisation *</label>
-                <select id="evtLocSelect" class="input mb-2" onchange="if(this.value==='Autre')document.getElementById('evtLocAutre').classList.remove('hidden');else document.getElementById('evtLocAutre').classList.add('hidden');">
+                <select id="evtLocSelect" class="input mb-2" onchange="document.getElementById('evtLocAutre').classList.toggle('hidden', this.value !== '__autre__')">
                     ${locOptions}
                 </select>
                 <input type="text" id="evtLocAutre" class="input hidden" placeholder="Précisez la localisation...">
@@ -2280,7 +2191,7 @@ function showModalEvenement() {
         const agentId = parseInt(document.getElementById('evtAgent').value);
         const locSelect = document.getElementById('evtLocSelect').value;
         const locAutre = document.getElementById('evtLocAutre').value.trim();
-        const localisation = locSelect === 'Autre' ? locAutre : locSelect;
+        const localisation = locSelect === '__autre__' ? locAutre : locSelect;
         const description = document.getElementById('evtDesc').value.trim();
         
         if (!description || !localisation) {
@@ -2296,11 +2207,12 @@ function showModalEvenement() {
             localisation,
             description,
             date: new Date().toISOString(),
-            suivis: []
+            commentaire: '',
+            compteRendu: ''
         };
         
         DB.evenements.unshift(evt);
-        addMainCourante(type, `🔴 DÉBUT: ${description.substring(0, 50)}...`, agentId, { localisation });
+        addMainCourante(type, `🔴 DÉBUT: ${description.substring(0, 50)}...`, agentId, { evenementId: evt.id, localisation });
         sauvegarderVersFirebase();
         
         closeModal();
@@ -2321,19 +2233,24 @@ function modifierStatutEvenement(id) {
             </div>
             <div>
                 <label class="block text-sm font-semibold mb-2">Nouveau statut</label>
-                <select id="evtNewStatut" class="input">
+                <select id="evtNewStatut" class="input" onchange="toggleEvtFields()">
                     <option value="Début" ${e.statut === 'Début' ? 'selected' : ''}>🔴 Début (Alerte)</option>
                     <option value="En cours" ${e.statut === 'En cours' ? 'selected' : ''}>🟠 En cours</option>
                     <option value="Terminé" ${e.statut === 'Terminé' ? 'selected' : ''}>🟢 Terminé</option>
                 </select>
             </div>
+            <div id="commentSection" class="${e.statut === 'En cours' ? '' : 'hidden'}">
+                <label class="block text-sm font-semibold mb-2">Commentaire de suivi</label>
+                <textarea id="evtComment" class="input" rows="3" placeholder="Actions en cours, observations...">${e.commentaire || ''}</textarea>
+            </div>
             <div id="crSection" class="${e.statut === 'Terminé' ? '' : 'hidden'}">
-                <label class="block text-sm font-semibold mb-2">Compte-rendu *</label>
+                <label class="block text-sm font-semibold mb-2">Compte-rendu final *</label>
                 <textarea id="evtCR" class="input" rows="4" placeholder="Actions menées, résolution...">${e.compteRendu || ''}</textarea>
             </div>
         </div>
     `, () => {
         const newStatut = document.getElementById('evtNewStatut').value;
+        const comment = document.getElementById('evtComment')?.value || '';
         const cr = document.getElementById('evtCR')?.value || '';
         
         if (newStatut === 'Terminé' && !cr.trim()) {
@@ -2341,33 +2258,33 @@ function modifierStatutEvenement(id) {
             return;
         }
         
-        const oldStatut = e.statut;
         e.statut = newStatut;
-        if (newStatut === 'Terminé') {
+        
+        if (newStatut === 'En cours') {
+            e.commentaire = comment;
+            addMainCourante('Événement', `🟠 ${e.type} - En cours${comment ? ': ' + comment.substring(0, 30) : ''}`, currentUser?.id, { evenementId: e.id });
+        } else if (newStatut === 'Terminé') {
             e.compteRendu = cr;
             e.dateCloture = new Date().toISOString();
+            addMainCourante('Événement', `🟢 ${e.type} - Terminé`, currentUser?.id, { evenementId: e.id });
+        } else {
+            addMainCourante('Événement', `🔴 ${e.type} - Début`, currentUser?.id, { evenementId: e.id });
         }
         
-        const icon = newStatut === 'Début' ? '🔴' : newStatut === 'En cours' ? '🟠' : '🟢';
-        addMainCourante('Événement', `${icon} ${e.type} - ${newStatut}`, currentUser?.id);
         sauvegarderVersFirebase();
-        
         closeModal();
         showToast(`Statut mis à jour: ${newStatut}`);
         navigate('evenements');
     });
+}
+
+function toggleEvtFields() {
+    const statut = document.getElementById('evtNewStatut')?.value;
+    const commentSection = document.getElementById('commentSection');
+    const crSection = document.getElementById('crSection');
     
-    // Afficher/masquer le champ CR selon le statut
-    setTimeout(() => {
-        document.getElementById('evtNewStatut')?.addEventListener('change', function() {
-            const crSection = document.getElementById('crSection');
-            if (this.value === 'Terminé') {
-                crSection?.classList.remove('hidden');
-            } else {
-                crSection?.classList.add('hidden');
-            }
-        });
-    }, 100);
+    if (commentSection) commentSection.classList.toggle('hidden', statut !== 'En cours');
+    if (crSection) crSection.classList.toggle('hidden', statut !== 'Terminé');
 }
 
 function voirEvenement(id) {
@@ -2408,9 +2325,16 @@ function voirEvenement(id) {
                 </div>
             </div>
             
+            ${e.commentaire ? `
+                <div class="bg-orange-50 p-4 rounded-xl">
+                    <div class="font-semibold text-orange-700 mb-2"><i class="fas fa-comment mr-1"></i>Commentaire</div>
+                    <p class="text-sm">${e.commentaire}</p>
+                </div>
+            ` : ''}
+            
             ${e.compteRendu ? `
                 <div class="bg-green-50 p-4 rounded-xl">
-                    <div class="font-semibold text-green-700 mb-2">Compte-rendu</div>
+                    <div class="font-semibold text-green-700 mb-2"><i class="fas fa-check-circle mr-1"></i>Compte-rendu</div>
                     <p class="text-sm">${e.compteRendu}</p>
                     ${e.dateCloture ? `<div class="text-xs text-gray-500 mt-2">Clôturé le ${formatDateTime(e.dateCloture)}</div>` : ''}
                 </div>
@@ -2448,11 +2372,16 @@ function renderMateriels() {
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-fire-extinguisher mr-2 text-primary-500"></i>Matériels
             </h1>
-            ${canAdd ? `
-                <button onclick="showModalMateriel()" class="btn btn-primary no-print">
-                    <i class="fas fa-plus"></i> Nouveau matériel
+            <div class="flex gap-2 no-print">
+                ${canAdd ? `
+                    <button onclick="showModalMateriel()" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nouveau
+                    </button>
+                ` : ''}
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="fas fa-print"></i>
                 </button>
-            ` : ''}
+            </div>
         </div>
         
         <div class="search-filters no-print">
@@ -2464,13 +2393,16 @@ function renderMateriels() {
             </select>
             <select class="input" onchange="filtresMateriels.statut = this.value; navigate('materiels')">
                 <option value="">Tous statuts</option>
-                <option value="Opérationnel">Opérationnel</option>
-                <option value="À vérifier">À vérifier</option>
-                <option value="Hors Service">Hors Service</option>
+                <option value="Opérationnel" ${filtresMateriels.statut === 'Opérationnel' ? 'selected' : ''}>Opérationnel</option>
+                <option value="À vérifier" ${filtresMateriels.statut === 'À vérifier' ? 'selected' : ''}>À vérifier</option>
+                <option value="Hors Service" ${filtresMateriels.statut === 'Hors Service' ? 'selected' : ''}>Hors Service</option>
             </select>
+            <button onclick="filtresMateriels = {texte:'', type:'', statut:''}; navigate('materiels')" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 no-print">
             <div class="stat-card"><div class="text-2xl font-bold text-blue-600">${stats.total}</div><div class="text-xs text-gray-500">Total</div></div>
             <div class="stat-card"><div class="text-2xl font-bold text-green-600">${stats.ok}</div><div class="text-xs text-gray-500">Opérationnels</div></div>
             <div class="stat-card"><div class="text-2xl font-bold text-orange-600">${stats.aVerifier}</div><div class="text-xs text-gray-500">À vérifier</div></div>
@@ -2530,7 +2462,7 @@ function voirMateriel(id) {
     
     showModal('Fiche Matériel', `
         <div class="space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-start justify-between gap-4">
                 <div>
                     <h3 class="text-xl font-bold">${m.nom}</h3>
                     <div class="flex gap-2 mt-1">
@@ -2538,7 +2470,9 @@ function voirMateriel(id) {
                         <span class="badge ${statutClass}">${m.statut}</span>
                     </div>
                 </div>
-                <div id="qrCodeMateriel" class="p-2 bg-white rounded-lg border"></div>
+                <div id="qrCodeMateriel" class="p-2 bg-white rounded-lg border min-w-[100px] min-h-[100px] flex items-center justify-center">
+                    <i class="fas fa-spinner fa-spin text-gray-300"></i>
+                </div>
             </div>
             
             <div class="grid grid-cols-2 gap-4">
@@ -2569,12 +2503,21 @@ function voirMateriel(id) {
         </div>
     `, null, 'Fermer');
     
-    // Générer QR code
     setTimeout(() => {
         const qrDiv = document.getElementById('qrCodeMateriel');
-        if (qrDiv && typeof QRCode !== 'undefined' && m.codeQR) {
+        if (qrDiv && m.codeQR) {
             qrDiv.innerHTML = '';
-            new QRCode(qrDiv, { text: m.codeQR, width: 80, height: 80 });
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    new QRCode(qrDiv, { text: m.codeQR, width: 80, height: 80 });
+                } catch(e) {
+                    qrDiv.innerHTML = `<span class="text-gray-400 text-xs font-mono">${m.codeQR}</span>`;
+                }
+            } else {
+                qrDiv.innerHTML = `<span class="text-gray-400 text-xs font-mono">${m.codeQR}</span>`;
+            }
+        } else if (qrDiv) {
+            qrDiv.innerHTML = '<span class="text-gray-400 text-xs">Pas de QR</span>';
         }
     }, 100);
 }
@@ -2654,6 +2597,20 @@ function modifierMateriel(id) {
     const types = ['Extincteur', 'RIA', 'Détecteur', 'Porte CF', 'BAES', 'Colonne sèche', 'Autre'];
     const statuts = ['Opérationnel', 'À vérifier', 'En maintenance', 'Hors Service'];
     
+    let locOptions = `<option value="">Sélectionner...</option>`;
+    let locFound = false;
+    configEtablissement.batiments.forEach(bat => {
+        bat.secteurs.forEach(sect => {
+            sect.zones.forEach(zone => {
+                const loc = `${bat.nom} > ${sect.nom} > ${zone}`;
+                const selected = m.localisation === loc;
+                if (selected) locFound = true;
+                locOptions += `<option value="${loc}" ${selected ? 'selected' : ''}>${loc}</option>`;
+            });
+        });
+    });
+    locOptions += `<option value="__autre__" ${m.localisation && !locFound ? 'selected' : ''}>Autre (saisie libre)</option>`;
+    
     showModal('Modifier Matériel', `
         <div class="space-y-4">
             <div>
@@ -2671,6 +2628,17 @@ function modifierMateriel(id) {
                 </div>
             </div>
             <div>
+                <label class="block text-sm font-semibold mb-2">Localisation</label>
+                <select id="matLocEdit" class="input mb-2" onchange="document.getElementById('matLocAutreEdit').classList.toggle('hidden', this.value !== '__autre__')">
+                    ${locOptions}
+                </select>
+                <input type="text" id="matLocAutreEdit" class="input ${m.localisation && !locFound ? '' : 'hidden'}" value="${m.localisation || ''}" placeholder="Saisir la localisation...">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Code QR</label>
+                <input type="text" id="matQREdit" class="input" value="${m.codeQR || ''}">
+            </div>
+            <div>
                 <label class="block text-sm font-semibold mb-2">Observation</label>
                 <textarea id="matObsEdit" class="input" rows="2">${m.observation || ''}</textarea>
             </div>
@@ -2679,9 +2647,14 @@ function modifierMateriel(id) {
         const nom = document.getElementById('matNomEdit').value.trim();
         if (!nom) return showToast('Nom requis', 'error');
         
+        const locSelect = document.getElementById('matLocEdit').value;
+        const locAutre = document.getElementById('matLocAutreEdit').value.trim();
+        
         m.nom = nom;
         m.type = document.getElementById('matTypeEdit').value;
         m.statut = document.getElementById('matStatutEdit').value;
+        m.localisation = locSelect === '__autre__' ? locAutre : locSelect;
+        m.codeQR = document.getElementById('matQREdit').value.trim();
         m.observation = document.getElementById('matObsEdit').value;
         
         addMainCourante('Matériel', `Modification: ${nom}`, currentUser?.id);
@@ -2697,55 +2670,70 @@ function modifierMateriel(id) {
 
 function renderConsignes() {
     const now = new Date();
-    const consignesActives = DB.consignes.filter(c => c.active && (!c.dateFin || new Date(c.dateFin) >= now));
+    
+    let consignesFiltrees = DB.consignes.filter(c => {
+        const estActive = c.active && (!c.dateFin || new Date(c.dateFin) >= now);
+        const matchTexte = !filtresConsignes.texte || 
+            c.titre.toLowerCase().includes(filtresConsignes.texte.toLowerCase()) ||
+            c.contenu.toLowerCase().includes(filtresConsignes.texte.toLowerCase());
+        const matchNiveau = !filtresConsignes.niveau || c.niveau === filtresConsignes.niveau;
+        const matchPriorite = !filtresConsignes.priorite || c.priorite === filtresConsignes.priorite;
+        return estActive && matchTexte && matchNiveau && matchPriorite;
+    });
     
     const canManage = ['SSIAP 2', 'SSIAP 3', 'Administrateur'].includes(currentUser?.qualification);
-    
-    const particulieres = consignesActives.filter(c => c.niveau === 'Particulière');
-    const permanentes = consignesActives.filter(c => c.niveau === 'Permanente');
-    const autres = consignesActives.filter(c => c.niveau !== 'Particulière' && c.niveau !== 'Permanente');
     
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-file-alt mr-2 text-primary-500"></i>Consignes
             </h1>
-            ${canManage ? `
-                <button onclick="showModalConsigne()" class="btn btn-primary no-print">
-                    <i class="fas fa-plus"></i> Nouvelle consigne
+            <div class="flex gap-2 no-print">
+                ${canManage ? `
+                    <button onclick="showModalConsigne()" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nouvelle
+                    </button>
+                ` : ''}
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="fas fa-print"></i>
                 </button>
-            ` : ''}
+            </div>
         </div>
         
-        <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="search-filters no-print">
+            <input type="text" class="input" placeholder="🔍 Rechercher..." value="${filtresConsignes.texte}" 
+                onchange="filtresConsignes.texte = this.value; navigate('consignes')">
+            <select class="input" onchange="filtresConsignes.niveau = this.value; navigate('consignes')">
+                <option value="">Tous niveaux</option>
+                <option value="Particulière" ${filtresConsignes.niveau === 'Particulière' ? 'selected' : ''}>Particulière</option>
+                <option value="Permanente" ${filtresConsignes.niveau === 'Permanente' ? 'selected' : ''}>Permanente</option>
+                <option value="Temporaire" ${filtresConsignes.niveau === 'Temporaire' ? 'selected' : ''}>Temporaire</option>
+            </select>
+            <select class="input" onchange="filtresConsignes.priorite = this.value; navigate('consignes')">
+                <option value="">Toutes priorités</option>
+                <option value="Urgente" ${filtresConsignes.priorite === 'Urgente' ? 'selected' : ''}>Urgente</option>
+                <option value="Haute" ${filtresConsignes.priorite === 'Haute' ? 'selected' : ''}>Haute</option>
+                <option value="Normale" ${filtresConsignes.priorite === 'Normale' ? 'selected' : ''}>Normale</option>
+                <option value="Basse" ${filtresConsignes.priorite === 'Basse' ? 'selected' : ''}>Basse</option>
+            </select>
+            <button onclick="filtresConsignes = {texte:'', niveau:'', priorite:''}; navigate('consignes')" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6 no-print">
             <div class="stat-card bg-orange-50">
-                <div class="text-2xl font-bold text-orange-600">${particulieres.length}</div>
+                <div class="text-2xl font-bold text-orange-600">${consignesFiltrees.filter(c => c.niveau === 'Particulière').length}</div>
                 <div class="text-xs text-orange-600">Particulières</div>
             </div>
             <div class="stat-card bg-blue-50">
-                <div class="text-2xl font-bold text-blue-600">${permanentes.length + autres.length}</div>
-                <div class="text-xs text-blue-600">Permanentes</div>
+                <div class="text-2xl font-bold text-blue-600">${consignesFiltrees.filter(c => c.niveau !== 'Particulière').length}</div>
+                <div class="text-xs text-blue-600">Permanentes/Autres</div>
             </div>
         </div>
         
-        <div class="grid lg:grid-cols-2 gap-6">
-            <div class="card">
-                <div class="gradient-warning text-white p-4 font-semibold rounded-t-2xl">
-                    <i class="fas fa-exclamation-circle mr-2"></i>Particulières (${particulieres.length})
-                </div>
-                <div class="p-4 space-y-3">
-                    ${particulieres.length ? particulieres.map(c => renderConsigneCard(c, canManage)).join('') : '<p class="text-gray-500 text-center py-4">Aucune consigne particulière</p>'}
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="gradient-info text-white p-4 font-semibold rounded-t-2xl">
-                    <i class="fas fa-file-alt mr-2"></i>Permanentes (${permanentes.length + autres.length})
-                </div>
-                <div class="p-4 space-y-3">
-                    ${[...permanentes, ...autres].length ? [...permanentes, ...autres].map(c => renderConsigneCard(c, canManage)).join('') : '<p class="text-gray-500 text-center py-4">Aucune consigne permanente</p>'}
-                </div>
-            </div>
+        <div class="card p-4 space-y-4">
+            ${consignesFiltrees.length ? consignesFiltrees.map(c => renderConsigneCard(c, canManage)).join('') : '<p class="text-gray-500 text-center py-8">Aucune consigne</p>'}
         </div>
     `;
 }
@@ -2758,6 +2746,7 @@ function renderConsigneCard(c, canManage) {
         <div class="p-4 bg-${couleur}-50 rounded-xl border-l-4 border-${couleur}-500">
             <div class="flex items-start justify-between gap-2 mb-2">
                 <div class="flex items-center gap-2 flex-wrap">
+                    <span class="badge ${c.niveau === 'Particulière' ? 'badge-warning' : 'badge-info'}">${c.niveau}</span>
                     <span class="badge ${prioriteClass}">${c.priorite || 'Normale'}</span>
                     <span class="badge badge-purple">${c.destinataire}</span>
                 </div>
@@ -2769,9 +2758,9 @@ function renderConsigneCard(c, canManage) {
                 ` : ''}
             </div>
             <div class="font-semibold mb-1">${c.titre}</div>
-            <p class="text-sm text-gray-600">${c.contenu.substring(0, 100)}${c.contenu.length > 100 ? '...' : ''}</p>
+            <p class="text-sm text-gray-600">${c.contenu.substring(0, 150)}${c.contenu.length > 150 ? '...' : ''}</p>
             ${c.dateFin ? `<div class="text-xs text-gray-500 mt-2">Jusqu'au ${formatDate(c.dateFin)}</div>` : ''}
-            <button onclick="voirConsigne(${c.id})" class="text-${couleur}-600 text-sm mt-2 hover:underline">
+            <button onclick="voirConsigne(${c.id})" class="text-${couleur}-600 text-sm mt-2 hover:underline no-print">
                 <i class="fas fa-eye mr-1"></i>Voir détails
             </button>
         </div>
@@ -2792,7 +2781,7 @@ function voirConsigne(id) {
             
             <h3 class="text-xl font-bold">${c.titre}</h3>
             
-            <div class="bg-gray-50 p-4 rounded-xl whitespace-pre-line">${c.contenu}</div>
+            <div class="bg-gray-50 p-4 rounded-xl whitespace-pre-line text-sm">${c.contenu}</div>
             
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div class="bg-gray-50 p-3 rounded-lg">
@@ -2956,7 +2945,15 @@ function supprimerConsigne(id) {
 // ==================== AGENTS ====================
 
 function renderAgents() {
-    const agentsTries = [...DB.agents].sort((a, b) => {
+    const qualifications = [...new Set(DB.agents.map(a => a.qualification))];
+    
+    let agentsFiltres = DB.agents.filter(a => {
+        const matchTexte = !filtresAgents.texte || 
+            `${a.prenom} ${a.nom}`.toLowerCase().includes(filtresAgents.texte.toLowerCase()) ||
+            (a.email || '').toLowerCase().includes(filtresAgents.texte.toLowerCase());
+        const matchQualif = !filtresAgents.qualification || a.qualification === filtresAgents.qualification;
+        return matchTexte && matchQualif;
+    }).sort((a, b) => {
         const ordre = { 'Administrateur': 0, 'SSIAP 3': 1, 'SSIAP 2': 2, 'SSIAP 1': 3 };
         return (ordre[a.qualification] ?? 4) - (ordre[b.qualification] ?? 4);
     });
@@ -2966,8 +2963,25 @@ function renderAgents() {
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-users mr-2 text-primary-500"></i>Agents
             </h1>
-            <button onclick="showModalAgent()" class="btn btn-primary no-print">
-                <i class="fas fa-plus"></i> Nouvel agent
+            <div class="flex gap-2 no-print">
+                <button onclick="showModalAgent()" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Nouveau
+                </button>
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="fas fa-print"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="search-filters no-print">
+            <input type="text" class="input" placeholder="🔍 Rechercher nom, email..." value="${filtresAgents.texte}" 
+                onchange="filtresAgents.texte = this.value; navigate('agents')">
+            <select class="input" onchange="filtresAgents.qualification = this.value; navigate('agents')">
+                <option value="">Toutes qualifications</option>
+                ${qualifications.map(q => `<option value="${q}" ${filtresAgents.qualification === q ? 'selected' : ''}>${q}</option>`).join('')}
+            </select>
+            <button onclick="filtresAgents = {texte:'', qualification:''}; navigate('agents')" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i>
             </button>
         </div>
         
@@ -2984,11 +2998,11 @@ function renderAgents() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${agentsTries.map(a => `
+                        ${agentsFiltres.map(a => `
                             <tr>
                                 <td>
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl gradient-header flex items-center justify-center text-white font-semibold">
+                                        <div class="w-10 h-10 rounded-xl gradient-header flex items-center justify-center text-white font-semibold no-print">
                                             ${a.prenom?.[0] || ''}${a.nom?.[0] || ''}
                                         </div>
                                         <div>
@@ -3001,9 +3015,14 @@ function renderAgents() {
                                 <td class="text-sm">${a.telephone || '-'}</td>
                                 <td><span class="badge ${a.actif ? 'badge-success' : 'badge-danger'}">${a.actif ? 'Actif' : 'Inactif'}</span></td>
                                 <td class="no-print">
-                                    <button onclick="voirAgent(${a.id})" class="btn btn-icon btn-secondary btn-sm">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                    <div class="flex gap-1">
+                                        <button onclick="voirAgent(${a.id})" class="btn btn-icon btn-secondary btn-sm" title="Voir">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button onclick="modifierAgent(${a.id})" class="btn btn-icon btn-secondary btn-sm" title="Modifier">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         `).join('')}
@@ -3134,6 +3153,76 @@ function showModalAgent() {
     });
 }
 
+function modifierAgent(id) {
+    const a = DB.agents.find(x => x.id === id);
+    if (!a) return;
+    
+    const qualifications = ['SSIAP 1', 'SSIAP 2', 'SSIAP 3'];
+    
+    showModal('Modifier Agent', `
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Prénom *</label>
+                    <input type="text" id="agentPrenomEdit" class="input" value="${a.prenom}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Nom *</label>
+                    <input type="text" id="agentNomEdit" class="input" value="${a.nom}">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Qualification</label>
+                    <select id="agentQualifEdit" class="input">
+                        ${qualifications.map(q => `<option ${a.qualification === q ? 'selected' : ''}>${q}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Statut</label>
+                    <select id="agentActifEdit" class="input">
+                        <option value="true" ${a.actif ? 'selected' : ''}>Actif</option>
+                        <option value="false" ${!a.actif ? 'selected' : ''}>Inactif</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Email</label>
+                    <input type="email" id="agentEmailEdit" class="input" value="${a.email || ''}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Téléphone</label>
+                    <input type="tel" id="agentTelEdit" class="input" value="${a.telephone || ''}">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-2">Entreprise</label>
+                <input type="text" id="agentEntrEdit" class="input" value="${a.entreprise || ''}">
+            </div>
+        </div>
+    `, () => {
+        const prenom = document.getElementById('agentPrenomEdit').value.trim();
+        const nom = document.getElementById('agentNomEdit').value.trim();
+        
+        if (!prenom || !nom) return showToast('Prénom et nom requis', 'error');
+        
+        a.prenom = prenom;
+        a.nom = nom;
+        a.qualification = document.getElementById('agentQualifEdit').value;
+        a.actif = document.getElementById('agentActifEdit').value === 'true';
+        a.email = document.getElementById('agentEmailEdit').value;
+        a.telephone = document.getElementById('agentTelEdit').value;
+        a.entreprise = document.getElementById('agentEntrEdit').value;
+        
+        sauvegarderVersFirebase();
+        closeModal();
+        showToast('✅ Agent modifié');
+        initLogin();
+        navigate('agents');
+    });
+}
+
 // ==================== ADMINISTRATION ====================
 
 function renderAdministration() {
@@ -3155,7 +3244,7 @@ function renderAdministration() {
             </h1>
         </div>
         
-        <div class="flex flex-wrap gap-2 mb-6">
+        <div class="flex flex-wrap gap-2 mb-6 no-print">
             ${tabs.map(t => `
                 <button onclick="adminTab='${t.id}'; navigate('administration')" class="btn ${adminTab === t.id ? 'btn-primary' : 'btn-secondary'}">
                     <i class="fas ${t.icon}"></i> ${t.label}
@@ -3214,7 +3303,6 @@ function renderAdminSync() {
 function renderAdminQRCodes() {
     let allPoints = [];
     
-    // Zones
     configEtablissement.batiments.forEach(bat => {
         bat.secteurs.forEach(sect => {
             sect.zones.forEach(zone => {
@@ -3224,7 +3312,6 @@ function renderAdminQRCodes() {
         });
     });
     
-    // Matériels
     DB.materiels.forEach(m => {
         allPoints.push({ type: m.type, nom: m.nom, chemin: m.localisation || '', qrCode: m.codeQR || `MAT-${m.id}` });
     });
@@ -3325,18 +3412,18 @@ function imprimerQRCodes() {
             <title>QR Codes SSIAP Patrol</title>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h1 { text-align: center; color: #4f46e5; margin-bottom: 10px; }
-                .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
-                .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-                .card { border: 2px solid #e5e7eb; padding: 12px; text-align: center; page-break-inside: avoid; border-radius: 8px; }
-                .card h3 { margin: 8px 0 4px; font-size: 11px; }
-                .card p { margin: 0; font-size: 9px; color: #666; }
-                .card .code { font-family: monospace; font-size: 7px; color: #999; margin-top: 4px; word-break: break-all; }
-                .badge { font-size: 8px; padding: 2px 6px; border-radius: 10px; display: inline-block; margin-bottom: 5px; }
+                body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
+                h1 { text-align: center; color: #4f46e5; margin-bottom: 10px; font-size: 16px; }
+                .subtitle { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+                .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+                .card { border: 1px solid #ccc; padding: 10px; text-align: center; page-break-inside: avoid; border-radius: 6px; }
+                .card h3 { margin: 6px 0 2px; font-size: 10px; }
+                .card p { margin: 0; font-size: 8px; color: #666; }
+                .card .code { font-family: monospace; font-size: 7px; color: #999; margin-top: 3px; word-break: break-all; }
+                .badge { font-size: 8px; padding: 2px 5px; border-radius: 8px; display: inline-block; margin-bottom: 4px; }
                 .badge-zone { background: #dbeafe; color: #1d4ed8; }
                 .badge-mat { background: #fef3c7; color: #d97706; }
-                @media print { .grid { grid-template-columns: repeat(4, 1fr); gap: 10px; } body { padding: 10px; } }
+                @media print { body { padding: 5px; } .grid { gap: 8px; } }
             </style>
         </head>
         <body>
@@ -3354,7 +3441,7 @@ function imprimerQRCodes() {
                 `).join('')}
             </div>
             <script>
-                ${allPoints.map((p, i) => `try { new QRCode(document.getElementById('qr${i}'), { text: '${p.qrCode}', width: 70, height: 70 }); } catch(e) {}`).join('\n')}
+                ${allPoints.map((p, i) => `try { new QRCode(document.getElementById('qr${i}'), { text: '${p.qrCode}', width: 60, height: 60 }); } catch(e) {}`).join('\n')}
                 setTimeout(() => window.print(), 1500);
             <\/script>
         </body>
@@ -3438,12 +3525,7 @@ function ajouterBatiment() {
         const nom = document.getElementById('batNom').value.trim();
         if (!nom) return showToast('Nom requis', 'error');
         
-        configEtablissement.batiments.push({ 
-            id: 'bat' + genId(), 
-            nom, 
-            secteurs: [] 
-        });
-        
+        configEtablissement.batiments.push({ id: 'bat' + genId(), nom, secteurs: [] });
         sauvegarderVersFirebase();
         closeModal();
         showToast('✅ Bâtiment ajouté');
@@ -3473,14 +3555,9 @@ function ajouterSecteur(batId) {
         
         const bat = configEtablissement.batiments.find(b => b.id === batId);
         if (bat) {
-            bat.secteurs.push({ 
-                id: batId + '-' + nom.toLowerCase().replace(/[^a-z0-9]/g, '-'), 
-                nom, 
-                zones: [] 
-            });
+            bat.secteurs.push({ id: batId + '-' + nom.toLowerCase().replace(/[^a-z0-9]/g, '-'), nom, zones: [] });
             sauvegarderVersFirebase();
         }
-        
         closeModal();
         showToast('✅ Secteur ajouté');
         navigate('administration');
@@ -3518,7 +3595,6 @@ function ajouterZone(batId, sectId) {
             sect.zones.push(nom);
             sauvegarderVersFirebase();
         }
-        
         closeModal();
         showToast('✅ Zone ajoutée');
         navigate('administration');
@@ -3698,7 +3774,7 @@ function showToast(message, type = 'success') {
 // ==================== INITIALISATION ====================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Démarrage SSIAP Patrol v2.0');
+    console.log('🚀 Démarrage SSIAP Patrol v2.1');
     
     chargerDepuisFirebase(() => {
         initLogin();
