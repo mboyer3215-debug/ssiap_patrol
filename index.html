@@ -2309,30 +2309,45 @@ function renderAdminQRCodes() {
     }
     
     let allPoints = [];
-    configEtablissement.batiments.forEach(bat => {
-        if (filtresQRCodes.batiment && bat.id !== filtresQRCodes.batiment) return;
-        bat.secteurs.forEach(sect => {
-            if (filtresQRCodes.secteur && sect.id !== filtresQRCodes.secteur) return;
-            if (filtresQRCodes.type && filtresQRCodes.type !== '__zones__') return;
-            sect.zones.forEach(zone => {
-                const qr = `ZONE-${bat.id}-${sect.id}-${zone.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
-                allPoints.push({ type: 'Zone', nom: zone, chemin: `${bat.nom} > ${sect.nom}`, qrCode: qr, batimentId: bat.id, secteurId: sect.id });
+    
+    // Ajouter les zones (sauf si on filtre par type matériel spécifique)
+    if (!filtresQRCodes.type || filtresQRCodes.type === '__zones__') {
+        configEtablissement.batiments.forEach(bat => {
+            if (filtresQRCodes.batiment && bat.id !== filtresQRCodes.batiment) return;
+            bat.secteurs.forEach(sect => {
+                if (filtresQRCodes.secteur && sect.id !== filtresQRCodes.secteur) return;
+                sect.zones.forEach(zone => {
+                    const qr = `ZONE-${bat.id}-${sect.id}-${zone.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+                    allPoints.push({ type: 'Zone', nom: zone, chemin: `${bat.nom} > ${sect.nom}`, qrCode: qr, batimentId: bat.id, secteurId: sect.id });
+                });
             });
         });
-    });
+    }
     
+    // Ajouter les matériels (sauf si on filtre "Zones uniquement")
     if (filtresQRCodes.type !== '__zones__') {
         DB.materiels.forEach(m => {
-            if (filtresQRCodes.type && m.type !== filtresQRCodes.type) return;
+            // Si filtre par type spécifique (pas vide et pas __materiels__)
+            if (filtresQRCodes.type && filtresQRCodes.type !== '__materiels__' && m.type !== filtresQRCodes.type) return;
+            
+            // Si filtre "__materiels__" = tous les matériels sans les zones
+            // On inclut tous les matériels
+            
+            // Filtre par bâtiment/secteur
             if (filtresQRCodes.batiment || filtresQRCodes.secteur) {
                 let matchLoc = false;
                 const bat = batiments.find(b => b.id === filtresQRCodes.batiment);
                 if (bat && m.localisation?.includes(bat.nom)) {
-                    if (filtresQRCodes.secteur) { const sect = bat.secteurs.find(s => s.id === filtresQRCodes.secteur); if (sect && m.localisation?.includes(sect.nom)) matchLoc = true; }
-                    else matchLoc = true;
+                    if (filtresQRCodes.secteur) {
+                        const sect = bat.secteurs.find(s => s.id === filtresQRCodes.secteur);
+                        if (sect && m.localisation?.includes(sect.nom)) matchLoc = true;
+                    } else {
+                        matchLoc = true;
+                    }
                 }
                 if (!matchLoc) return;
             }
+            
             allPoints.push({ type: m.type, nom: m.nom, chemin: m.localisation || '', qrCode: m.codeQR || `MAT-${m.id}` });
         });
     }
@@ -2345,22 +2360,60 @@ function renderAdminQRCodes() {
                 <h2 class="text-lg font-bold"><i class="fas fa-qrcode mr-2"></i>QR Codes (${allPoints.length})</h2>
                 <button onclick="imprimerQRCodesFiltres()" class="btn btn-primary"><i class="fas fa-print mr-2"></i>Imprimer</button>
             </div>
+            
             <div class="bg-gray-50 p-4 rounded-xl space-y-3">
                 <div class="font-semibold text-sm text-gray-700"><i class="fas fa-filter mr-2"></i>Filtrer les QR Codes</div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div><label class="block text-xs text-gray-500 mb-1">Bâtiment</label><select class="input" onchange="filtresQRCodes.batiment = this.value; filtresQRCodes.secteur = ''; navigate('administration')"><option value="">Tous les bâtiments</option>${batiments.map(b => `<option value="${b.id}" ${filtresQRCodes.batiment === b.id ? 'selected' : ''}>${b.nom}</option>`).join('')}</select></div>
-                    <div><label class="block text-xs text-gray-500 mb-1">Secteur</label><select class="input" onchange="filtresQRCodes.secteur = this.value; navigate('administration')" ${!filtresQRCodes.batiment ? 'disabled' : ''}><option value="">Tous les secteurs</option>${secteursDisponibles.map(s => `<option value="${s.id}" ${filtresQRCodes.secteur === s.id ? 'selected' : ''}>${s.nom}</option>`).join('')}</select></div>
-                    <div><label class="block text-xs text-gray-500 mb-1">Type</label><select class="input" onchange="filtresQRCodes.type = this.value; navigate('administration')"><option value="">Zones + Tous matériels</option><option value="__zones__" ${filtresQRCodes.type === '__zones__' ? 'selected' : ''}>Zones uniquement</option>${typesMateriels.map(t => `<option value="${t}" ${filtresQRCodes.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Bâtiment</label>
+                        <select class="input" onchange="filtresQRCodes.batiment = this.value; filtresQRCodes.secteur = ''; navigate('administration')">
+                            <option value="">Tous les bâtiments</option>
+                            ${batiments.map(b => `<option value="${b.id}" ${filtresQRCodes.batiment === b.id ? 'selected' : ''}>${b.nom}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Secteur</label>
+                        <select class="input" onchange="filtresQRCodes.secteur = this.value; navigate('administration')" ${!filtresQRCodes.batiment ? 'disabled' : ''}>
+                            <option value="">Tous les secteurs</option>
+                            ${secteursDisponibles.map(s => `<option value="${s.id}" ${filtresQRCodes.secteur === s.id ? 'selected' : ''}>${s.nom}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Type</label>
+                        <select class="input" onchange="filtresQRCodes.type = this.value; navigate('administration')">
+                            <option value="" ${filtresQRCodes.type === '' ? 'selected' : ''}>Zones + Tous matériels</option>
+                            <option value="__zones__" ${filtresQRCodes.type === '__zones__' ? 'selected' : ''}>Zones uniquement</option>
+                            <option value="__materiels__" ${filtresQRCodes.type === '__materiels__' ? 'selected' : ''}>Tous les matériels</option>
+                            <optgroup label="Par type de matériel">
+                                ${typesMateriels.map(t => `<option value="${t}" ${filtresQRCodes.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                            </optgroup>
+                        </select>
+                    </div>
                 </div>
-                <div class="flex justify-end"><button onclick="filtresQRCodes = {batiment:'', secteur:'', type:''}; navigate('administration')" class="btn btn-secondary btn-sm"><i class="fas fa-times mr-1"></i>Réinitialiser</button></div>
+                <div class="flex justify-end">
+                    <button onclick="filtresQRCodes = {batiment:'', secteur:'', type:''}; navigate('administration')" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-times mr-1"></i>Réinitialiser
+                    </button>
+                </div>
             </div>
+            
             <div class="grid grid-cols-2 gap-4">
                 <div class="stat-card bg-blue-50"><div class="text-2xl font-bold text-blue-600">${allPoints.filter(p => p.type === 'Zone').length}</div><div class="text-xs">Zones</div></div>
                 <div class="stat-card bg-orange-50"><div class="text-2xl font-bold text-orange-600">${allPoints.filter(p => p.type !== 'Zone').length}</div><div class="text-xs">Matériels</div></div>
             </div>
+            
             <div class="qr-grid" id="qrCodesContainer">
-                ${allPoints.length > 0 ? allPoints.slice(0, 20).map((p, i) => `<div class="qr-card"><div class="text-xs mb-2"><span class="badge ${p.type === 'Zone' ? 'badge-info' : 'badge-warning'}">${p.type}</span></div><div id="qr-admin-${i}" class="mb-2 flex justify-center min-h-[80px]"></div><div class="font-semibold text-sm">${p.nom}</div><div class="text-xs text-gray-500 truncate">${p.chemin}</div><div class="text-xs text-gray-400 font-mono mt-1 truncate">${p.qrCode}</div></div>`).join('') : '<div class="col-span-full text-center py-8 text-gray-500">Aucun QR code trouvé</div>'}
+                ${allPoints.length > 0 ? allPoints.slice(0, 20).map((p, i) => `
+                    <div class="qr-card">
+                        <div class="text-xs mb-2"><span class="badge ${p.type === 'Zone' ? 'badge-info' : 'badge-warning'}">${p.type}</span></div>
+                        <div id="qr-admin-${i}" class="mb-2 flex justify-center min-h-[80px]"></div>
+                        <div class="font-semibold text-sm">${p.nom}</div>
+                        <div class="text-xs text-gray-500 truncate">${p.chemin}</div>
+                        <div class="text-xs text-gray-400 font-mono mt-1 truncate">${p.qrCode}</div>
+                    </div>
+                `).join('') : '<div class="col-span-full text-center py-8 text-gray-500">Aucun QR code trouvé</div>'}
             </div>
+            
             ${allPoints.length > 20 ? `<p class="text-center text-gray-500 text-sm">Affichage des 20 premiers sur ${allPoints.length}. Utilisez "Imprimer" pour tous les voir.</p>` : ''}
         </div>
     `;
@@ -2382,36 +2435,104 @@ function imprimerQRCodesFiltres() {
     let allPoints = [];
     const batiments = configEtablissement.batiments;
     
-    configEtablissement.batiments.forEach(bat => {
-        if (filtresQRCodes.batiment && bat.id !== filtresQRCodes.batiment) return;
-        bat.secteurs.forEach(sect => {
-            if (filtresQRCodes.secteur && sect.id !== filtresQRCodes.secteur) return;
-            if (filtresQRCodes.type && filtresQRCodes.type !== '__zones__') return;
-            sect.zones.forEach(zone => { allPoints.push({ type: 'Zone', nom: zone, chemin: `${bat.nom} > ${sect.nom}`, qrCode: `ZONE-${bat.id}-${sect.id}-${zone.toUpperCase().replace(/[^A-Z0-9]/g, '')}` }); });
+    // Ajouter les zones (sauf si filtre matériel spécifique)
+    if (!filtresQRCodes.type || filtresQRCodes.type === '__zones__') {
+        configEtablissement.batiments.forEach(bat => {
+            if (filtresQRCodes.batiment && bat.id !== filtresQRCodes.batiment) return;
+            bat.secteurs.forEach(sect => {
+                if (filtresQRCodes.secteur && sect.id !== filtresQRCodes.secteur) return;
+                sect.zones.forEach(zone => {
+                    allPoints.push({ 
+                        type: 'Zone', 
+                        nom: zone, 
+                        chemin: `${bat.nom} > ${sect.nom}`, 
+                        qrCode: `ZONE-${bat.id}-${sect.id}-${zone.toUpperCase().replace(/[^A-Z0-9]/g, '')}` 
+                    });
+                });
+            });
         });
-    });
+    }
     
+    // Ajouter les matériels (sauf si "Zones uniquement")
     if (filtresQRCodes.type !== '__zones__') {
         DB.materiels.forEach(m => {
-            if (filtresQRCodes.type && m.type !== filtresQRCodes.type) return;
+            if (filtresQRCodes.type && filtresQRCodes.type !== '__materiels__' && m.type !== filtresQRCodes.type) return;
+            
             if (filtresQRCodes.batiment || filtresQRCodes.secteur) {
                 let matchLoc = false;
                 const bat = batiments.find(b => b.id === filtresQRCodes.batiment);
-                if (bat && m.localisation?.includes(bat.nom)) { if (filtresQRCodes.secteur) { const sect = bat.secteurs.find(s => s.id === filtresQRCodes.secteur); if (sect && m.localisation?.includes(sect.nom)) matchLoc = true; } else matchLoc = true; }
+                if (bat && m.localisation?.includes(bat.nom)) {
+                    if (filtresQRCodes.secteur) {
+                        const sect = bat.secteurs.find(s => s.id === filtresQRCodes.secteur);
+                        if (sect && m.localisation?.includes(sect.nom)) matchLoc = true;
+                    } else {
+                        matchLoc = true;
+                    }
+                }
                 if (!matchLoc) return;
             }
+            
             allPoints.push({ type: m.type, nom: m.nom, chemin: m.localisation || '', qrCode: m.codeQR || `MAT-${m.id}` });
         });
     }
     
-    if (allPoints.length === 0) { showToast('Aucun QR code à imprimer', 'warning'); return; }
+    if (allPoints.length === 0) { 
+        showToast('Aucun QR code à imprimer', 'warning'); 
+        return; 
+    }
     
     let titreFiltre = 'Tous les QR Codes';
-    if (filtresQRCodes.batiment) { const bat = batiments.find(b => b.id === filtresQRCodes.batiment); titreFiltre = bat?.nom || ''; if (filtresQRCodes.secteur) { const sect = bat?.secteurs.find(s => s.id === filtresQRCodes.secteur); titreFiltre += ` > ${sect?.nom || ''}`; } }
-    if (filtresQRCodes.type) titreFiltre += filtresQRCodes.type === '__zones__' ? ' (Zones)' : ` (${filtresQRCodes.type})`;
+    if (filtresQRCodes.batiment) {
+        const bat = batiments.find(b => b.id === filtresQRCodes.batiment);
+        titreFiltre = bat?.nom || '';
+        if (filtresQRCodes.secteur) {
+            const sect = bat?.secteurs.find(s => s.id === filtresQRCodes.secteur);
+            titreFiltre += ` > ${sect?.nom || ''}`;
+        }
+    }
+    if (filtresQRCodes.type === '__zones__') titreFiltre += ' (Zones uniquement)';
+    else if (filtresQRCodes.type === '__materiels__') titreFiltre += ' (Tous matériels)';
+    else if (filtresQRCodes.type) titreFiltre += ` (${filtresQRCodes.type})`;
+    
+    // Générer le code QR JavaScript séparément
+    const qrScripts = allPoints.map((p, i) => 
+        `try{new QRCode(document.getElementById('qr${i}'),{text:'${p.qrCode}',width:60,height:60})}catch(e){}`
+    ).join(';');
     
     const pw = window.open('', '_blank');
-    pw.document.write(`<!DOCTYPE html><html><head><title>QR Codes - ${titreFiltre}</title><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><style>body{font-family:Arial,sans-serif;padding:20px;font-size:11px}h1{text-align:center;color:#4f46e5;margin-bottom:5px;font-size:16px}.subtitle{text-align:center;color:#666;margin-bottom:20px;font-size:11px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.card{border:1px solid #ccc;padding:10px;text-align:center;page-break-inside:avoid;border-radius:6px}.card h3{margin:6px 0 2px;font-size:10px}.card p{margin:0;font-size:8px;color:#666}.card .code{font-family:monospace;font-size:7px;color:#999;margin-top:3px;word-break:break-all}.badge{font-size:8px;padding:2px 5px;border-radius:8px;display:inline-block;margin-bottom:4px}.badge-zone{background:#dbeafe;color:#1d4ed8}.badge-mat{background:#fef3c7;color:#d97706}@media print{body{padding:5px}.grid{gap:8px}}</style></head><body><h1>🔒 QR Codes SSIAP Patrol</h1><p class="subtitle">${titreFiltre} • ${allPoints.length} QR codes • ${new Date().toLocaleDateString('fr-FR')}</p><div class="grid">${allPoints.map((p, i) => `<div class="card"><span class="badge ${p.type === 'Zone' ? 'badge-zone' : 'badge-mat'}">${p.type}</span><div id="qr${i}"></div><h3>${p.nom}</h3><p>${p.chemin}</p><div class="code">${p.qrCode}</div></div>`).join('')}</div><script>${allPoints.map((p, i) => `try{new QRCode(document.getElementById('qr${i}'),{text:'${p.qrCode}',width:60,height:60})}catch(e){}`).join('\n')}setTimeout(()=>window.print(),1500)<\/script></body></html>`);
+    pw.document.write(
+        '<!DOCTYPE html><html><head><title>QR Codes - ' + titreFiltre + '</title>' +
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><' + '/script>' +
+        '<style>' +
+        'body{font-family:Arial,sans-serif;padding:20px;font-size:11px}' +
+        'h1{text-align:center;color:#4f46e5;margin-bottom:5px;font-size:16px}' +
+        '.subtitle{text-align:center;color:#666;margin-bottom:20px;font-size:11px}' +
+        '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}' +
+        '.card{border:1px solid #ccc;padding:10px;text-align:center;page-break-inside:avoid;border-radius:6px}' +
+        '.card h3{margin:6px 0 2px;font-size:10px}' +
+        '.card p{margin:0;font-size:8px;color:#666}' +
+        '.card .code{font-family:monospace;font-size:7px;color:#999;margin-top:3px;word-break:break-all}' +
+        '.badge{font-size:8px;padding:2px 5px;border-radius:8px;display:inline-block;margin-bottom:4px}' +
+        '.badge-zone{background:#dbeafe;color:#1d4ed8}' +
+        '.badge-mat{background:#fef3c7;color:#d97706}' +
+        '@media print{body{padding:5px}.grid{gap:8px}}' +
+        '</style></head><body>' +
+        '<h1>🔒 QR Codes SSIAP Patrol</h1>' +
+        '<p class="subtitle">' + titreFiltre + ' • ' + allPoints.length + ' QR codes • ' + new Date().toLocaleDateString('fr-FR') + '</p>' +
+        '<div class="grid">' +
+        allPoints.map((p, i) => 
+            '<div class="card">' +
+            '<span class="badge ' + (p.type === 'Zone' ? 'badge-zone' : 'badge-mat') + '">' + p.type + '</span>' +
+            '<div id="qr' + i + '"></div>' +
+            '<h3>' + p.nom + '</h3>' +
+            '<p>' + p.chemin + '</p>' +
+            '<div class="code">' + p.qrCode + '</div>' +
+            '</div>'
+        ).join('') +
+        '</div>' +
+        '<script>' + qrScripts + ';setTimeout(function(){window.print()},1500)<' + '/script>' +
+        '</body></html>'
+    );
 }
 
 function renderAdminEtablissement() {
