@@ -102,7 +102,6 @@
             .main-content { margin-left: 0 !important; } 
         }
         
-        /* STYLES IMPRESSION OPTIMISÉS */
         @media print {
             .no-print { display: none !important; }
             .sidebar { display: none !important; }
@@ -118,7 +117,6 @@
             .gradient-header, .gradient-success, .gradient-warning, .gradient-info { 
                 background: #f3f4f6 !important; 
                 color: #1f2937 !important; 
-                -webkit-print-color-adjust: exact;
             }
         }
         
@@ -392,7 +390,7 @@ function sauvegarderVersFirebase() {
     console.log('💾 Sauvegarde - Rondes:', DB.rondes.length, 'MC:', DB.mainCourante.length);
     
     const saveData = {
-        version: '2.0',
+        version: '2.1',
         date: new Date().toISOString(),
         agents: DB.agents,
         materiels: DB.materiels,
@@ -743,19 +741,13 @@ function navigate(view) {
         document.getElementById('sidebarOverlay')?.classList.add('hidden');
     }
     
-    // Générer QR codes si nécessaire
+    // Générer QR codes après rendu
     if (view === 'dashboard') {
-        setTimeout(() => {
-            const qrDiv = document.getElementById('qrCodeAccess');
-            if (qrDiv && typeof QRCode !== 'undefined') {
-                qrDiv.innerHTML = '';
-                new QRCode(qrDiv, { text: window.location.href.split('?')[0] + '?mode=rondier', width: 100, height: 100 });
-            }
-        }, 100);
+        setTimeout(() => genererQRCodeDashboard(), 300);
     }
     
     if (view === 'administration' && adminTab === 'qrcodes') {
-        setTimeout(() => genererQRCodesAdmin(), 200);
+        setTimeout(() => genererQRCodesAdmin(), 300);
     }
 }
 
@@ -818,7 +810,9 @@ function renderDashboard() {
                     <p class="opacity-90">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl no-print">
-                    <div id="qrCodeAccess"></div>
+                    <div id="qrCodeAccess" class="min-w-[100px] min-h-[100px] flex items-center justify-center">
+                        <i class="fas fa-spinner fa-spin text-gray-300 text-2xl"></i>
+                    </div>
                     <p class="text-center text-xs text-gray-600 mt-1">Accès Rondier</p>
                 </div>
             </div>
@@ -896,6 +890,23 @@ function renderDashboard() {
     `;
 }
 
+function genererQRCodeDashboard() {
+    const qrDiv = document.getElementById('qrCodeAccess');
+    if (qrDiv && typeof QRCode !== 'undefined') {
+        qrDiv.innerHTML = '';
+        try {
+            new QRCode(qrDiv, { 
+                text: window.location.href.split('?')[0] + '?mode=rondier', 
+                width: 100, 
+                height: 100,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        } catch(e) {
+            qrDiv.innerHTML = '<span class="text-gray-400 text-xs">QR indisponible</span>';
+        }
+    }
+}
+
 // ==================== PRISE DE POSTE ====================
 
 function renderPrisePoste() {
@@ -908,10 +919,10 @@ function renderPrisePoste() {
             </h1>
             <div class="flex gap-2 no-print">
                 <button onclick="showModalPrisePoste()" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Nouvelle
+                    <i class="fas fa-plus mr-2"></i>Nouvelle
                 </button>
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="fas fa-print"></i>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print mr-2"></i>Imprimer
                 </button>
             </div>
         </div>
@@ -942,7 +953,7 @@ function renderPrisePoste() {
                                         <td>${formatDateTime(a.heureDebut)}</td>
                                         <td class="no-print">
                                             <button onclick="finPoste(${a.prisePosteId})" class="btn btn-danger btn-sm">
-                                                <i class="fas fa-stop"></i> Fin
+                                                <i class="fas fa-stop mr-1"></i>Fin
                                             </button>
                                         </td>
                                     </tr>
@@ -1428,10 +1439,10 @@ function scannerPointControle(rondeId) {
             
             <div class="flex gap-2">
                 <button onclick="demarrerScanQR(${rondeId})" id="btnStartScan" class="btn btn-primary flex-1">
-                    <i class="fas fa-camera"></i> Démarrer caméra
+                    <i class="fas fa-camera mr-2"></i>Démarrer caméra
                 </button>
                 <button onclick="arreterScanQR()" id="btnStopScan" class="btn btn-danger flex-1 hidden">
-                    <i class="fas fa-stop"></i> Arrêter
+                    <i class="fas fa-stop mr-2"></i>Arrêter
                 </button>
             </div>
             
@@ -1490,9 +1501,7 @@ function demarrerScanQR(rondeId) {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-            console.log('✅ QR scanné:', decodedText);
             resultsDiv.innerHTML = `<span class="text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>${decodedText}</span>`;
-            
             if (navigator.vibrate) navigator.vibrate(200);
             
             html5QrScanner.stop().then(() => {
@@ -1508,7 +1517,6 @@ function demarrerScanQR(rondeId) {
     ).then(() => {
         resultsDiv.innerHTML = '<span class="text-green-500"><i class="fas fa-camera mr-1"></i>Pointez vers un QR code</span>';
     }).catch((err) => {
-        console.error('Erreur caméra:', err);
         resultsDiv.innerHTML = `<span class="text-red-500">${err}</span>`;
         btnStart.classList.remove('hidden');
         btnStop.classList.add('hidden');
@@ -1630,9 +1638,19 @@ function validerPoint(rondeId, pointId, statut) {
                         <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez le problème..."></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Photo (optionnel)</label>
-                        <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input" onchange="previewPhoto(this)">
-                        <div id="photoPreview" class="mt-2"></div>
+                        <label class="block text-sm font-semibold mb-2">Photos (optionnel)</label>
+                        <div class="flex gap-2 mb-2">
+                            <button type="button" onclick="ajouterPhoto()" class="btn btn-secondary flex-1">
+                                <i class="fas fa-camera mr-2"></i>Prendre photo
+                            </button>
+                            <button type="button" onclick="ajouterPhotoGalerie()" class="btn btn-secondary flex-1">
+                                <i class="fas fa-images mr-2"></i>Galerie
+                            </button>
+                        </div>
+                        <input type="file" id="anomaliePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="traiterPhotos(this)" multiple>
+                        <input type="file" id="anomaliePhotoGalerie" accept="image/*" class="hidden" onchange="traiterPhotos(this)" multiple>
+                        <div id="photosPreview" class="flex flex-wrap gap-2 mt-2"></div>
+                        <p class="text-xs text-gray-500 mt-1">Vous pouvez ajouter plusieurs photos</p>
                     </div>
                     ${horsService && point.materielId ? `
                         <div class="bg-red-100 p-3 rounded-lg text-sm text-red-700">
@@ -1652,9 +1670,10 @@ function validerPoint(rondeId, pointId, statut) {
                 point.heureValidation = new Date().toISOString();
                 point.statut = statut;
                 
-                // Récupérer la photo en base64
-                const photoPreview = document.querySelector('#photoPreview img');
-                const photoBase64 = photoPreview ? photoPreview.src : null;
+                const photos = [];
+                document.querySelectorAll('#photosPreview img').forEach(img => {
+                    photos.push(img.src);
+                });
                 
                 if (!r.anomalies) r.anomalies = [];
                 r.anomalies.push({
@@ -1662,13 +1681,12 @@ function validerPoint(rondeId, pointId, statut) {
                     pointId,
                     pointNom: point.nom,
                     description: desc,
-                    photo: photoBase64,
+                    photos: photos,
                     horsService,
                     date: new Date().toISOString(),
                     agentId: currentUser.id
                 });
                 
-                // Si HS et matériel associé
                 if (horsService && point.materielId) {
                     const mat = DB.materiels.find(m => m.id === point.materielId);
                     if (mat) {
@@ -1690,9 +1708,19 @@ function validerPoint(rondeId, pointId, statut) {
     }
 }
 
-function previewPhoto(input) {
-    const preview = document.getElementById('photoPreview');
-    if (input.files && input.files[0]) {
+function ajouterPhoto() {
+    document.getElementById('anomaliePhotoInput')?.click();
+}
+
+function ajouterPhotoGalerie() {
+    document.getElementById('anomaliePhotoGalerie')?.click();
+}
+
+function traiterPhotos(input) {
+    const preview = document.getElementById('photosPreview');
+    if (!input.files || input.files.length === 0 || !preview) return;
+    
+    Array.from(input.files).forEach(file => {
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = new Image();
@@ -1716,12 +1744,30 @@ function previewPhoto(input) {
                 ctx.drawImage(img, 0, 0, width, height);
                 
                 const compressed = canvas.toDataURL('image/jpeg', 0.7);
-                preview.innerHTML = `<img src="${compressed}" class="max-h-40 rounded-lg">`;
+                
+                const photoId = 'photo-' + Date.now() + Math.random().toString(36).substr(2, 5);
+                const div = document.createElement('div');
+                div.id = photoId;
+                div.className = 'relative';
+                div.innerHTML = `
+                    <img src="${compressed}" class="w-20 h-20 object-cover rounded-lg">
+                    <button type="button" onclick="supprimerPhotoPreview('${photoId}')" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                preview.appendChild(div);
             };
             img.src = e.target.result;
         };
-        reader.readAsDataURL(input.files[0]);
-    }
+        reader.readAsDataURL(file);
+    });
+    
+    input.value = '';
+}
+
+function supprimerPhotoPreview(photoId) {
+    const el = document.getElementById(photoId);
+    if (el) el.remove();
 }
 
 function signalerAnomalieMobile(rondeId) {
@@ -1739,9 +1785,18 @@ function signalerAnomalieMobile(rondeId) {
                 <textarea id="anomalieDesc" class="input" rows="3" placeholder="Décrivez le problème..."></textarea>
             </div>
             <div>
-                <label class="block text-sm font-semibold mb-2">Photo (optionnel)</label>
-                <input type="file" id="anomaliePhoto" accept="image/*" capture="environment" class="input" onchange="previewPhoto(this)">
-                <div id="photoPreview" class="mt-2"></div>
+                <label class="block text-sm font-semibold mb-2">Photos (optionnel)</label>
+                <div class="flex gap-2 mb-2">
+                    <button type="button" onclick="ajouterPhoto()" class="btn btn-secondary flex-1">
+                        <i class="fas fa-camera mr-2"></i>Prendre photo
+                    </button>
+                    <button type="button" onclick="ajouterPhotoGalerie()" class="btn btn-secondary flex-1">
+                        <i class="fas fa-images mr-2"></i>Galerie
+                    </button>
+                </div>
+                <input type="file" id="anomaliePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="traiterPhotos(this)" multiple>
+                <input type="file" id="anomaliePhotoGalerie" accept="image/*" class="hidden" onchange="traiterPhotos(this)" multiple>
+                <div id="photosPreview" class="flex flex-wrap gap-2 mt-2"></div>
             </div>
         </div>
     `, () => {
@@ -1753,15 +1808,17 @@ function signalerAnomalieMobile(rondeId) {
             return;
         }
         
-        const photoPreview = document.querySelector('#photoPreview img');
-        const photoBase64 = photoPreview ? photoPreview.src : null;
+        const photos = [];
+        document.querySelectorAll('#photosPreview img').forEach(img => {
+            photos.push(img.src);
+        });
         
         if (!r.anomalies) r.anomalies = [];
         r.anomalies.push({
             id: genId(),
             localisation: loc,
             description: desc,
-            photo: photoBase64,
+            photos: photos,
             horsService: false,
             date: new Date().toISOString(),
             agentId: currentUser.id
@@ -1922,23 +1979,29 @@ function voirRonde(id) {
                         ${r.anomalies.some(a => a.horsService) ? '🚫' : '⚠️'} Anomalies (${r.anomalies.length})
                     </div>
                     <div class="space-y-4">
-                        ${r.anomalies.map(a => `
-                            <div class="bg-white p-3 rounded-lg border-l-4 ${a.horsService ? 'border-red-500' : 'border-orange-500'}">
-                                <div class="flex items-start gap-2">
-                                    <i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mt-1"></i>
-                                    <div class="flex-1">
-                                        <div class="font-semibold">${a.pointNom || a.localisation || 'Point'}</div>
-                                        <p class="text-sm text-gray-600 mt-1">${a.description}</p>
-                                        <div class="text-xs text-gray-400 mt-1">${formatDateTime(a.date)}</div>
-                                        ${a.photo ? `
-                                            <div class="mt-2">
-                                                <img src="${a.photo}" class="max-h-32 rounded-lg cursor-pointer" onclick="agrandirPhoto('${a.photo.replace(/'/g, "\\'")}')">
-                                            </div>
-                                        ` : ''}
+                        ${r.anomalies.map(a => {
+                            const photos = a.photos || (a.photo ? [a.photo] : []);
+                            return `
+                                <div class="bg-white p-3 rounded-lg border-l-4 ${a.horsService ? 'border-red-500' : 'border-orange-500'}">
+                                    <div class="flex items-start gap-2">
+                                        <i class="fas fa-${a.horsService ? 'ban text-red-500' : 'exclamation-triangle text-orange-500'} mt-1"></i>
+                                        <div class="flex-1">
+                                            <div class="font-semibold">${a.pointNom || a.localisation || 'Point'}</div>
+                                            <p class="text-sm text-gray-600 mt-1">${a.description}</p>
+                                            <div class="text-xs text-gray-400 mt-1">${formatDateTime(a.date)}</div>
+                                            ${photos.length > 0 ? `
+                                                <div class="flex flex-wrap gap-2 mt-2">
+                                                    ${photos.map(photo => `
+                                                        <img src="${photo}" class="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80" onclick="agrandirPhoto('${photo.replace(/'/g, "\\'")}')">
+                                                    `).join('')}
+                                                </div>
+                                                <p class="text-xs text-gray-400 mt-1">${photos.length} photo(s)</p>
+                                            ` : ''}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             ` : ''}
@@ -2075,10 +2138,10 @@ function renderEvenements() {
             </h1>
             <div class="flex gap-2 no-print">
                 <button onclick="showModalEvenement()" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Nouveau
+                    <i class="fas fa-plus mr-2"></i>Nouveau
                 </button>
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="fas fa-print"></i>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print mr-2"></i>Imprimer
                 </button>
             </div>
         </div>
@@ -2375,11 +2438,11 @@ function renderMateriels() {
             <div class="flex gap-2 no-print">
                 ${canAdd ? `
                     <button onclick="showModalMateriel()" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Nouveau
+                        <i class="fas fa-plus mr-2"></i>Nouveau
                     </button>
                 ` : ''}
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="fas fa-print"></i>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print mr-2"></i>Imprimer
                 </button>
             </div>
         </div>
@@ -2463,14 +2526,14 @@ function voirMateriel(id) {
     showModal('Fiche Matériel', `
         <div class="space-y-4">
             <div class="flex items-start justify-between gap-4">
-                <div>
+                <div class="flex-1">
                     <h3 class="text-xl font-bold">${m.nom}</h3>
                     <div class="flex gap-2 mt-1">
                         <span class="badge badge-info">${m.type}</span>
                         <span class="badge ${statutClass}">${m.statut}</span>
                     </div>
                 </div>
-                <div id="qrCodeMateriel" class="p-2 bg-white rounded-lg border min-w-[100px] min-h-[100px] flex items-center justify-center">
+                <div id="qrCodeMaterielView" class="bg-white p-2 rounded-lg border min-w-[100px] min-h-[100px] flex items-center justify-center">
                     <i class="fas fa-spinner fa-spin text-gray-300"></i>
                 </div>
             </div>
@@ -2504,22 +2567,23 @@ function voirMateriel(id) {
     `, null, 'Fermer');
     
     setTimeout(() => {
-        const qrDiv = document.getElementById('qrCodeMateriel');
-        if (qrDiv && m.codeQR) {
+        const qrDiv = document.getElementById('qrCodeMaterielView');
+        if (qrDiv && m.codeQR && typeof QRCode !== 'undefined') {
             qrDiv.innerHTML = '';
-            if (typeof QRCode !== 'undefined') {
-                try {
-                    new QRCode(qrDiv, { text: m.codeQR, width: 80, height: 80 });
-                } catch(e) {
-                    qrDiv.innerHTML = `<span class="text-gray-400 text-xs font-mono">${m.codeQR}</span>`;
-                }
-            } else {
+            try {
+                new QRCode(qrDiv, { 
+                    text: m.codeQR, 
+                    width: 80, 
+                    height: 80,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch(e) {
                 qrDiv.innerHTML = `<span class="text-gray-400 text-xs font-mono">${m.codeQR}</span>`;
             }
         } else if (qrDiv) {
             qrDiv.innerHTML = '<span class="text-gray-400 text-xs">Pas de QR</span>';
         }
-    }, 100);
+    }, 200);
 }
 
 function showModalMateriel() {
@@ -2613,9 +2677,14 @@ function modifierMateriel(id) {
     
     showModal('Modifier Matériel', `
         <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-semibold mb-2">Nom *</label>
-                <input type="text" id="matNomEdit" class="input" value="${m.nom}">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-2">Nom *</label>
+                    <input type="text" id="matNomEdit" class="input" value="${m.nom}">
+                </div>
+                <div id="qrCodeMaterielEdit" class="bg-white p-2 rounded-lg border min-w-[80px] min-h-[80px] flex items-center justify-center">
+                    <i class="fas fa-spinner fa-spin text-gray-300"></i>
+                </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -2664,6 +2733,25 @@ function modifierMateriel(id) {
         showToast('✅ Matériel modifié');
         navigate('materiels');
     });
+    
+    setTimeout(() => {
+        const qrDiv = document.getElementById('qrCodeMaterielEdit');
+        if (qrDiv && m.codeQR && typeof QRCode !== 'undefined') {
+            qrDiv.innerHTML = '';
+            try {
+                new QRCode(qrDiv, { 
+                    text: m.codeQR, 
+                    width: 70, 
+                    height: 70,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch(e) {
+                qrDiv.innerHTML = `<span class="text-gray-400 text-xs font-mono">${m.codeQR}</span>`;
+            }
+        } else if (qrDiv) {
+            qrDiv.innerHTML = '<span class="text-gray-400 text-xs">Pas de QR</span>';
+        }
+    }, 200);
 }
 
 // ==================== CONSIGNES ====================
@@ -2691,11 +2779,11 @@ function renderConsignes() {
             <div class="flex gap-2 no-print">
                 ${canManage ? `
                     <button onclick="showModalConsigne()" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Nouvelle
+                        <i class="fas fa-plus mr-2"></i>Nouvelle
                     </button>
                 ` : ''}
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="fas fa-print"></i>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print mr-2"></i>Imprimer
                 </button>
             </div>
         </div>
@@ -2965,10 +3053,10 @@ function renderAgents() {
             </h1>
             <div class="flex gap-2 no-print">
                 <button onclick="showModalAgent()" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Nouveau
+                    <i class="fas fa-plus mr-2"></i>Nouveau
                 </button>
-                <button onclick="window.print()" class="btn btn-secondary">
-                    <i class="fas fa-print"></i>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print mr-2"></i>Imprimer
                 </button>
             </div>
         </div>
@@ -3233,21 +3321,26 @@ function renderAdministration() {
         { id: 'donnees', label: 'Données', icon: 'fa-database' }
     ];
     
-    if (adminTab === 'qrcodes') {
-        setTimeout(() => genererQRCodesAdmin(), 200);
-    }
-    
     return `
-        <div class="mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <h1 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-cogs mr-2 text-primary-500"></i>Administration
             </h1>
+            <button onclick="window.print()" class="btn btn-primary no-print">
+                <i class="fas fa-print mr-2"></i>Imprimer
+            </button>
+        </div>
+        
+        <div class="search-filters no-print">
+            <select class="input" onchange="adminTab = this.value; navigate('administration')">
+                ${tabs.map(t => `<option value="${t.id}" ${adminTab === t.id ? 'selected' : ''}><i class="fas ${t.icon}"></i> ${t.label}</option>`).join('')}
+            </select>
         </div>
         
         <div class="flex flex-wrap gap-2 mb-6 no-print">
             ${tabs.map(t => `
                 <button onclick="adminTab='${t.id}'; navigate('administration')" class="btn ${adminTab === t.id ? 'btn-primary' : 'btn-secondary'}">
-                    <i class="fas ${t.icon}"></i> ${t.label}
+                    <i class="fas ${t.icon} mr-2"></i>${t.label}
                 </button>
             `).join('')}
         </div>
@@ -3316,6 +3409,8 @@ function renderAdminQRCodes() {
         allPoints.push({ type: m.type, nom: m.nom, chemin: m.localisation || '', qrCode: m.codeQR || `MAT-${m.id}` });
     });
     
+    setTimeout(() => genererQRCodesAdmin(), 300);
+    
     return `
         <div class="space-y-6">
             <div class="flex items-center justify-between flex-wrap gap-4">
@@ -3342,7 +3437,7 @@ function renderAdminQRCodes() {
                         <div class="text-xs mb-2">
                             <span class="badge ${p.type === 'Zone' ? 'badge-info' : 'badge-warning'}">${p.type}</span>
                         </div>
-                        <div id="qr-${i}" class="mb-2 flex justify-center"></div>
+                        <div id="qr-${i}" class="mb-2 flex justify-center min-h-[80px]"></div>
                         <div class="font-semibold text-sm">${p.nom}</div>
                         <div class="text-xs text-gray-500 truncate">${p.chemin}</div>
                         <div class="text-xs text-gray-400 font-mono mt-1 truncate">${p.qrCode}</div>
@@ -3382,8 +3477,15 @@ function genererQRCodesAdmin() {
         if (container) {
             container.innerHTML = '';
             try {
-                new QRCode(container, { text: p.qrCode, width: 80, height: 80 });
-            } catch(e) {}
+                new QRCode(container, { 
+                    text: p.qrCode, 
+                    width: 80, 
+                    height: 80,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch(e) {
+                container.innerHTML = `<span class="text-gray-400 text-xs font-mono">${p.qrCode}</span>`;
+            }
         }
     });
 }
@@ -3455,7 +3557,7 @@ function renderAdminEtablissement() {
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold"><i class="fas fa-building mr-2"></i>Structure de l'établissement</h2>
                 <button onclick="ajouterBatiment()" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus"></i> Bâtiment
+                    <i class="fas fa-plus mr-2"></i>Bâtiment
                 </button>
             </div>
             
@@ -3470,7 +3572,7 @@ function renderAdminEtablissement() {
                                     <div class="text-sm text-gray-500">${bat.secteurs.length} secteur(s), ${bat.secteurs.reduce((acc, s) => acc + s.zones.length, 0)} zone(s)</div>
                                 </div>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 no-print">
                                 <button onclick="ajouterSecteur('${bat.id}')" class="btn btn-sm btn-success" title="Ajouter secteur">
                                     <i class="fas fa-plus"></i>
                                 </button>
@@ -3486,7 +3588,7 @@ function renderAdminEtablissement() {
                                         <div class="font-semibold">
                                             <i class="fas fa-layer-group text-green-600 mr-2"></i>${sect.nom}
                                         </div>
-                                        <div class="flex gap-1">
+                                        <div class="flex gap-1 no-print">
                                             <button onclick="ajouterZone('${bat.id}', '${sect.id}')" class="btn btn-icon btn-sm btn-success" title="Ajouter zone">
                                                 <i class="fas fa-plus"></i>
                                             </button>
@@ -3499,7 +3601,7 @@ function renderAdminEtablissement() {
                                         ${sect.zones.map(zone => `
                                             <span class="badge badge-info">
                                                 ${zone}
-                                                <button onclick="supprimerZone('${bat.id}', '${sect.id}', '${zone}')" class="ml-1 text-red-500 hover:text-red-700">&times;</button>
+                                                <button onclick="supprimerZone('${bat.id}', '${sect.id}', '${zone}')" class="ml-1 text-red-500 hover:text-red-700 no-print">&times;</button>
                                             </span>
                                         `).join('')}
                                         ${sect.zones.length === 0 ? '<span class="text-gray-400 text-sm">Aucune zone</span>' : ''}
@@ -3644,7 +3746,7 @@ function renderAdminDonnees() {
 
 function exporterDonnees() {
     const data = {
-        version: '2.0',
+        version: '2.1',
         date: new Date().toISOString(),
         agents: DB.agents,
         materiels: DB.materiels,
