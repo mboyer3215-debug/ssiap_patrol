@@ -2677,9 +2677,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && !document.getElementById('loginScreen')?.classList.contains('hidden')) login(); });
-</script>
-</body>
-</html>
 
 function getMainCouranteBadgeClass(type) {
     if (['Alarme', 'Secours', 'Incident', 'Intrusion', 'Anomalie'].some(t => type.includes(t))) return 'badge-danger';
@@ -2687,3 +2684,9 @@ function getMainCouranteBadgeClass(type) {
     if (['Prise', 'Départ', 'Ronde', 'En cours'].some(t => type.includes(t))) return 'badge-warning';
     return 'badge-info';
 }
+    
+</script>
+</body>
+</html>
+
+
