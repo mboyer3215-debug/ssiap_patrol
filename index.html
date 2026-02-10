@@ -856,17 +856,40 @@ function arreterScanQR() {
 }
 
 function validerQRCodeAuto(rondeId, code) {
+    console.log('=== DEBUG SCAN ===');
     const r = DB.rondes.find(x => x.id === rondeId);
-    if (!r) { showToast('❌ Ronde non trouvée', 'error'); return; }
+    if (!r) { 
+        console.log('❌ Ronde non trouvée, id:', rondeId);
+        showToast('❌ Ronde non trouvée', 'error'); 
+        return; 
+    }
+    
     const codeNormalise = code.trim().toUpperCase();
-    console.log('🔍 Recherche code:', codeNormalise);
-    console.log('📋 Codes disponibles:', r.pointsControle.map(p => p.qrCode));
+    console.log('Code scanné (normalisé):', codeNormalise);
+    console.log('Points disponibles:');
+    r.pointsControle.forEach((p, i) => {
+        const qrNormalise = (p.qrCode || '').trim().toUpperCase();
+        console.log(`  ${i}: "${qrNormalise}" - ${p.nom}`);
+    });
+    
     const point = r.pointsControle.find(p => {
         const qrNormalise = (p.qrCode || '').trim().toUpperCase();
-        return qrNormalise === codeNormalise;
+        const match = qrNormalise === codeNormalise;
+        if (match) console.log('✅ MATCH trouvé:', p.nom);
+        return match;
     });
-    if (!point) { showToast('❌ Code QR non reconnu', 'error'); return; }
-    if (point.valide) { showToast('⚠️ Point déjà validé', 'warning'); return; }
+    
+    if (!point) { 
+        console.log('❌ Aucun match trouvé');
+        showToast('❌ Code QR non reconnu pour cette ronde', 'error'); 
+        return; 
+    }
+    if (point.valide) { 
+        showToast('⚠️ Point déjà validé', 'warning'); 
+        return; 
+    }
+    
+    console.log('Ouverture panneau validation pour:', point.nom);
     closeModal();
     setTimeout(() => ouvrirPanneauValidationPoint(rondeId, point.id), 400);
 }
